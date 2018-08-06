@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="cronio",
-    version="0.0.1",
+    version="1.0.0",
     author="Nikolas Valerkos",
     author_email="n.valerkos@gmail.com",
     description="This project has a sender and a receiver, the sender sends commands through RabbitMQ on the queue of a worker (receiver), the receiver executes them either with OS or Python2.7",
