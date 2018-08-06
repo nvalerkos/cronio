@@ -7,6 +7,7 @@ INTRO
 ## Objectives
 
 - [x] Prototype - Send some commands in OS or in Python and execute them, bring back the log or errors if any
+- [x] Package Structure
 - [ ] Dependent Commands ie. cmd_dependancy: [1,2,3,200]
 - [ ] Time to be executed ie. using python-crontab would be a good thing
 - [ ] ENVs needs to be tested with docker that it can be set and read from this app.py
@@ -30,6 +31,19 @@ or
 You can get one using our docker image - default username and password is guest.
 If you want the dockerfile for it, you can go to the folder's repository myrabbitmq.
 
+## Examples
+
+For Code see examples/ directory
+	
+Worker:
+
+	python worker.py # this will start the process, see inline comments
+
+
+Sender:
+
+	python test1.py
+	python test2.py 
 
 ## Execute OS commands and pass a cmd_id (ID)
 
