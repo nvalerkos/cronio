@@ -31,6 +31,14 @@ or
 You can get one using our docker image - default username and password is guest.
 If you want the dockerfile for it, you can go to the folder's repository myrabbitmq.
 
+## Installation 
+
+PyPi
+
+	pip install cronio
+
+
+
 ## Examples
 
 For Code see examples/ directory
