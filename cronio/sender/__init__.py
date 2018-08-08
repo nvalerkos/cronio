@@ -1,14 +1,14 @@
 from __future__ import absolute_import
 import time, sys, pprint, json, os, tempfile
 import logging
-import stomp
+import stomp,uuid
 
 
 class CronioSender(object):
 	def __init__(self, settings = {}):
 		#Set Default Values
 		self.assignSenderDefaultValues()
-		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER']
+		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER','CRONIO_SENDER_ID']
 		for key in settingKeys:
 			if key in settings:
 				setattr(self, key, settings[key])
@@ -21,6 +21,7 @@ class CronioSender(object):
 		self.logger_sender.addHandler(loggerSH)
 		self.cronio_sender_listener = self.CronioSenderListener(self)
 		self.initConnectSenderSTOMP()
+		self.myself = self
 
 	class CronioSenderListener(stomp.ConnectionListener):
 		def __init__(self, parent):
@@ -37,8 +38,8 @@ class CronioSender(object):
 			self.parent.conn.ack(headers['message-id'],1)
 
 	def assignSenderDefaultValues(self):
-		self.CRONIO_SENDER_EXCHANGE_LOG_INFO = "cronio_log_info"
-		self.CRONIO_SENDER_EXCHANGE_LOG_ERROR = "cronio_log_error"
+		self.CRONIO_SENDER_EXCHANGE_LOG_INFO = False
+		self.CRONIO_SENDER_EXCHANGE_LOG_ERROR = False
 		self.CRONIO_SENDER_AMQP_USERNAME = "sender1"
 		self.CRONIO_SENDER_AMQP_PASSWORD = "somepass"
 		self.CRONIO_SENDER_WORKER_QUEUE = "cronio_queue"
@@ -48,10 +49,12 @@ class CronioSender(object):
 		self.CRONIO_SENDER_AMQP_USE_SSL = False
 		self.CRONIO_SENDER_LOGGER_LEVEL =  logging.INFO
 		self.CRONIO_SENDER_LOGGER_FORMATTER = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+		self.CRONIO_SENDER_ID = 'sender1'
+		self.CRONIO_SENDER_API_LOG = 'cronio_api_log_' + self.CRONIO_SENDER_ID
 
 
-	def sendCMD(self, cmd, is_type = "python", cmd_id=False):
-		jobSend = {"cmd": cmd, "type": is_type, "cmd_id": cmd_id}
+	def sendCMD(self, cmd, is_type = "python", cmd_id=False, dependencies = None):
+		jobSend = {"cmd": cmd, "type": is_type, "cmd_id": cmd_id,'sender':self.CRONIO_SENDER_ID, 'dependencies': dependencies, 'api_log': self.CRONIO_SENDER_API_LOG}
 		self.logger_sender.debug('Sending CMD: %s' % cmd)
 		self.conn.send(body=json.dumps(jobSend), destination=self.CRONIO_SENDER_WORKER_QUEUE, vhost=self.CRONIO_SENDER_AMQP_VHOST)
 
@@ -95,18 +98,17 @@ class CronioSender(object):
 
 	def initConnectSenderSTOMP(self):
 		self.conn = stomp.Connection(host_and_ports=[(self.CRONIO_SENDER_AMQP_HOST, self.CRONIO_SENDER_AMQP_PORT)],use_ssl=self.CRONIO_SENDER_AMQP_USE_SSL,vhost=self.CRONIO_SENDER_AMQP_VHOST)
-		self.conn.set_listener('', self.cronio_sender_listener)
+		self.conn.set_listener('default', self.cronio_sender_listener)
 		self.conn.start()
 		try:
 			self.conn.connect(self.CRONIO_SENDER_AMQP_USERNAME, self.CRONIO_SENDER_AMQP_PASSWORD, wait=True)
+			print "Connected..."
 		except Exception as e:
 			self.logger_sender.critical('Failed to connect to STOMP "%s"' % str(e))
 			raise e
 		# ack=auto when received removes it from queue
 		# ack='client' make it ack only when told to
-		self.conn.subscribe(destination=self.CRONIO_SENDER_EXCHANGE_LOG_INFO, id="log", ack='client')
-		self.conn.subscribe(destination=self.CRONIO_SENDER_EXCHANGE_LOG_ERROR, id="error", ack='client')
-
+		
 # this is disabled, the below def function __exit__ should automatically disconnect
 		# wait a bit until all executed, it 	
 		# TODO Wait until all of your send cmds are executed and then leave.
@@ -118,8 +120,4 @@ class CronioSender(object):
 		# else:
 		# 	self.logger_sender.debug('Waiting for ever! -- or manually disconnect, can use CRONIO_SENDER_RUNTIME_SECONDS for a specific time to disconnect')
 	
-	def __exit__(self, exc_type, exc_value, tb):
-		self.logger_sender.debug('Disconnecting...')
-		self.conn.disconnect()
-
 
