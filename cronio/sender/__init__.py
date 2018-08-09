@@ -74,7 +74,11 @@ class CronioSender(object):
 		# 	self.logger_sender.debug('Exception while sending/reading python file: %s' % e)
 		# 	return False
 			
-			
+	def sendWorkflow(self, workflow):
+
+		for cmd in workflow:
+			print cmd
+			self.sendCMD(cmd['cmd'], cmd['type'], cmd['cmd_id'], cmd['dependencies'])
 
 	def sendCmdFile(self, cmdFile, cmd_id = False):
 		try:

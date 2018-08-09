@@ -85,8 +85,14 @@ CS.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","os",cmd_i
 CS.sendCMD("ls","os",cmd_ids[2])
 # execute python commands using that repo - you will need to change the sys.path.append.
 CS.sendCMD("import sys\nsys.path.append('/home/nikolas/cronio/examples/python-crontab')\nfrom crontab import CronTab\ncron = CronTab(user='nikolas')\niter2 = cron.find_comment('comment')  \nfor item2 in iter2:  \n\tprint item2","python",cmd_ids[3],[cmd_ids[2],cmd_ids[1]])
-
-# Clear Database
+CS.sendCMD("print 'hello'","python",cmd_ids[3],None)
+# Clear Database of its commands
 CS.sendCMD('cleardb','operation',1)
+# 
+commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2]},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None}]
+
+CS.sendWorkflow(commands)
+
+
 
 time.sleep(10)

@@ -241,7 +241,7 @@ class CronioWorker(object):
 		if ERROR != "" or ExceptionError != "":
 			self.logger_worker.debug('  ERROR: %s'% str(ERROR+str(ExceptionError)))
 		if self.CRONIO_TEST_IS_NOT_ON:
-			self.sendAPILog(result_code,{'out':OUT,'error':ERROR,'exception':ExceptionError},cmd_id, job_message['api_log'])
+			self.sendAPILog(result_code,{'out':OUT,'error':str(ERROR),'exception':str(ExceptionError)},cmd_id, job_message['api_log'])
 			self.addToCommandLog(cmd_id, cmd, job_message['type'], job_message['sender'], job_message['dependencies'], result_code, job_message['api_log'])
 			self.sendLog({'log':OUT, 'error': ERROR+str(ExceptionError) },cmd_id)
 		return True
@@ -277,12 +277,13 @@ class CronioWorker(object):
 		sys.stderr = codeErr
 		ExceptionError = u""
 		try:
-			os.chdir(sef.CRONIO_WORKER_WORK_DIR)
+			os.chdir(self.CRONIO_WORKER_WORK_DIR)
 			self.logger_worker.debug('PYTHON RUN command: %s'%str(cmd))
 			exec cmd
 		except Exception as e:
+			raise e
 			self.logger_worker.debug(' Exception: %s'%str(e))
-			ExceptionError = e
+			ExceptionError = str(e)
 			result_code = 1
 		finally:
 			sys.stdout = sys.__stdout__
@@ -312,6 +313,7 @@ class CronioWorker(object):
 		api_message['type'] = 'job'
 		api_message['worker_id'] = self.CRONIO_WORKER_ID
 		if self.CRONIO_TEST_IS_NOT_ON:
+			pprint.pprint(api_message)
 			self.conn.send(body=json.dumps(api_message), destination=api_log, vhost=self.CRONIO_AMQP_VHOST)
 
 	def sendAPIInform(self, info, api_log):
