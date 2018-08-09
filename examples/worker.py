@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys,os,logging
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+#sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cronio import CronioUtils, CronioWorker, CronioSender
 
