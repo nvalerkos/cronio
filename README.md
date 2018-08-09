@@ -53,7 +53,7 @@ Sender:
 
 ## Custom Listener for Sender
 
-Modify it base on your current needs on listening for worker's messages to act accordingly.
+Modify it based on your current needs on listening for worker's messages to act accordingly.
 
 	class CronioSenderListener(stomp.ConnectionListener):
 		def on_error(self, headers, message):
