@@ -58,12 +58,12 @@ class CronioSender(object):
 		self.logger_sender.debug('Sending CMD: %s' % cmd)
 		self.conn.send(body=json.dumps(jobSend), destination=self.CRONIO_SENDER_WORKER_QUEUE, vhost=self.CRONIO_SENDER_AMQP_VHOST)
 
-	def sendPythonFile(self, pythonFile, cmd_id = False):
+	def sendPythonFile(self, pythonFile, cmd_id = False, dependencies = None):
 		if (os.path.isfile(pythonFile)):
 			self.logger_sender.debug('Reading Python file: %s' % pythonFile)
 			with open(pythonFile) as f:
 				cmds = f.readlines()
-			self.sendCMD("".join(cmds),"python",cmd_id)
+			self.sendCMD("".join(cmds),"python",cmd_id, dependencies)
 			return True
 		else:
 			print 'Python file does not exists : %s' % pythonFile
@@ -73,20 +73,14 @@ class CronioSender(object):
 		# 	raise e
 		# 	self.logger_sender.debug('Exception while sending/reading python file: %s' % e)
 		# 	return False
-			
-	def sendWorkflow(self, workflow):
 
-		for cmd in workflow:
-			print cmd
-			self.sendCMD(cmd['cmd'], cmd['type'], cmd['cmd_id'], cmd['dependencies'])
-
-	def sendCmdFile(self, cmdFile, cmd_id = False):
+	def sendCmdFile(self, cmdFile, cmd_id = False, dependencies = None):
 		try:
 			if (os.path.isfile(cmdFile)):
 				self.logger_sender.debug('Reading commands file: %s' % cmdFile)
 				with open(cmdFile) as f:
 					cmds = f.readlines()
-				self.sendCMD("".join(cmds),"os",cmd_id)
+				self.sendCMD("".join(cmds),"os",cmd_id,dependencies)
 				return True
 			else:
 				self.logger_sender.debug('Commands file does not exists : %s' % cmdFile)
@@ -95,6 +89,12 @@ class CronioSender(object):
 			print e
 			self.logger_sender.debug('Exception while sending/reading commands file: %s' % e)
 			return False
+			
+	def sendWorkflow(self, workflow):
+
+		for cmd in workflow:
+			print cmd
+			self.sendCMD(cmd['cmd'], cmd['type'], cmd['cmd_id'], cmd['dependencies'])
 
 	def disconnectSenderSTOMP(self):
 		self.logger_sender.debug('Disconnecting...')
