@@ -8,7 +8,7 @@ class CronioSender(object):
 	def __init__(self, settings = {}):
 		#Set Default Values
 		self.assignSenderDefaultValues()
-		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER','CRONIO_SENDER_ID']
+		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER','CRONIO_SENDER_ID','CRONIO_SENDER_WORKER_PREFIX']
 		for key in settingKeys:
 			if key in settings:
 				setattr(self, key, settings[key])
@@ -42,7 +42,6 @@ class CronioSender(object):
 		self.CRONIO_SENDER_EXCHANGE_LOG_ERROR = False
 		self.CRONIO_SENDER_AMQP_USERNAME = "sender1"
 		self.CRONIO_SENDER_AMQP_PASSWORD = "somepass"
-		self.CRONIO_SENDER_WORKER_QUEUE = "cronio_queue"
 		self.CRONIO_SENDER_AMQP_HOST = 'localhost'
 		self.CRONIO_SENDER_AMQP_VHOST = '/'
 		self.CRONIO_SENDER_AMQP_PORT = 61613
@@ -50,20 +49,21 @@ class CronioSender(object):
 		self.CRONIO_SENDER_LOGGER_LEVEL =  logging.INFO
 		self.CRONIO_SENDER_LOGGER_FORMATTER = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 		self.CRONIO_SENDER_ID = 'sender1'
+		self.CRONIO_SENDER_WORKER_PREFIX = '/queue/cronio/workers/'
 		self.CRONIO_SENDER_API_LOG = 'cronio_api_log_' + self.CRONIO_SENDER_ID
 
 
-	def sendCMD(self, cmd, is_type = "python", cmd_id=False, dependencies = None):
+	def sendCMD(self, cmd, worker_id, is_type = "python", cmd_id=False, dependencies = None):
 		jobSend = {"cmd": cmd, "type": is_type, "cmd_id": cmd_id,'sender':self.CRONIO_SENDER_ID, 'dependencies': dependencies, 'api_log': self.CRONIO_SENDER_API_LOG}
-		self.logger_sender.debug('Sending CMD: %s' % cmd)
-		self.conn.send(body=json.dumps(jobSend), destination=self.CRONIO_SENDER_WORKER_QUEUE, vhost=self.CRONIO_SENDER_AMQP_VHOST)
+		self.logger_sender.debug('Sending CMD: %s | To worker_id: %s' % (cmd, worker_id))
+		self.conn.send(body=json.dumps(jobSend), destination=self.CRONIO_SENDER_WORKER_PREFIX+worker_id, vhost=self.CRONIO_SENDER_AMQP_VHOST)
 
-	def sendPythonFile(self, pythonFile, cmd_id = False, dependencies = None):
+	def sendPythonFile(self, pythonFile, worker_id, cmd_id = False, dependencies = None):
 		if (os.path.isfile(pythonFile)):
 			self.logger_sender.debug('Reading Python file: %s' % pythonFile)
 			with open(pythonFile) as f:
 				cmds = f.readlines()
-			self.sendCMD("".join(cmds),"python",cmd_id, dependencies)
+			self.sendCMD("".join(cmds), worker_id, "python",cmd_id, dependencies)
 			return True
 		else:
 			print 'Python file does not exists : %s' % pythonFile
@@ -74,13 +74,13 @@ class CronioSender(object):
 		# 	self.logger_sender.debug('Exception while sending/reading python file: %s' % e)
 		# 	return False
 
-	def sendCmdFile(self, cmdFile, cmd_id = False, dependencies = None):
+	def sendCmdFile(self, cmdFile, worker_id, cmd_id = False, dependencies = None):
 		try:
 			if (os.path.isfile(cmdFile)):
 				self.logger_sender.debug('Reading commands file: %s' % cmdFile)
 				with open(cmdFile) as f:
 					cmds = f.readlines()
-				self.sendCMD("".join(cmds),"os",cmd_id,dependencies)
+				self.sendCMD("".join(cmds), worker_id, "os",cmd_id,dependencies)
 				return True
 			else:
 				self.logger_sender.debug('Commands file does not exists : %s' % cmdFile)
@@ -94,7 +94,7 @@ class CronioSender(object):
 
 		for cmd in workflow:
 			print cmd
-			self.sendCMD(cmd['cmd'], cmd['type'], cmd['cmd_id'], cmd['dependencies'])
+			self.sendCMD(cmd['cmd'], cmd['worker_id'], cmd['type'], cmd['cmd_id'], cmd['dependencies'])
 
 	def disconnectSenderSTOMP(self):
 		self.logger_sender.debug('Disconnecting...')

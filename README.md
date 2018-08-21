@@ -11,9 +11,6 @@ INTRO
 - [x] Dependent Commands ie. dependancy: [1,2,3,200, cmd_id]
 - [ ] Time to be executed ie. using python-crontab would be a good thing
 - [ ] ENVs needs to be tested with docker that it can be set and read from this app.py
-- [ ] Sender: Wait until all of your send cmds are executed and then leave.
-- [ ] Worker: check if its the right binary to execute python2.7
-- [ ] Run in other Languages ie. Ruby, Java, Cobol? Kidding..
 
 
 ## Requirements
@@ -74,6 +71,18 @@ Modify it based on your current needs on listening for worker's messages to act 
 				print "view_log - or error"
 			# remove from queue
 			CS.conn.ack(headers['message-id'],1)
+
+
+## Worker Queues
+> After version 1.1.0, the worker queues are modified in a more standardized way to enable the multiworker dependancy:
+ie.
+
+	self.CRONIO_WORKER_ID = '1_worker'
+	self.CRONIO_WORKER_PREFIX = '/queue/cronio/'
+	self.CRONIO_WORKER_QUEUE =  self.CRONIO_WORKER_PREFIX + self.CRONIO_WORKER_ID
+	
+> Hence that, the CRONIO_WORKER_QUEUE param in class and settings needs to be avoided if you want to have the multiworker dependancy to work. Otherwise we will need to add namespaces for it. Which are going a bit off topic.
+> Ensure that you set CRONIO_WORKER_ID and CRONIO_WORKER_PREFIX on each worker and have the same CRONIO_WORKER_PREFIX in all workers. Avoid using CRONIO_WORKER_ID in the format: worker1 and worker11 otherwise you might end up having difficulty setting permissions for specific workers.
 
 
 ## Execute OS commands and pass a cmd_id (ID)

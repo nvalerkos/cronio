@@ -22,11 +22,20 @@ class CronioWorker(object):
 	def __init__(self, settings = {}):
 		#Set Default Values
 		self.assignDefaultValues()
-		settingKeys = ['CRONIO_AMQP_USERNAME','CRONIO_AMQP_PASSWORD','CRONIO_EXCHANGE_LOG_INFO','CRONIO_EXCHANGE_LOG_ERROR','CRONIO_WORKER_QUEUE','CRONIO_AMQP_HOST','CRONIO_AMQP_VHOST','CRONIO_AMQP_PORT','CRONIO_AMQP_USE_SSL','CRONIO_LOGGER_LEVEL','CRONIO_LOGGER_FORMATTER','CRONIO_ENGINE_RUNTIME_SECONDS','CRONIO_TEST_IS_NOT_ON','CRONIO_WORKER_WORK_DIR','CRONIO_WORKER_ID','REFRESH_DATABASE']
+		settingKeys = ['CRONIO_AMQP_USERNAME','CRONIO_AMQP_PASSWORD','CRONIO_EXCHANGE_LOG_INFO','CRONIO_EXCHANGE_LOG_ERROR','CRONIO_AMQP_HOST','CRONIO_AMQP_VHOST','CRONIO_AMQP_PORT','CRONIO_AMQP_USE_SSL','CRONIO_LOGGER_LEVEL','CRONIO_LOGGER_FORMATTER','CRONIO_ENGINE_RUNTIME_SECONDS','CRONIO_TEST_IS_NOT_ON','CRONIO_WORKER_WORK_DIR','CRONIO_WORKER_ID','CRONIO_WORKER_PREFIX','CRONIO_WORKER_QUEUE','REFRESH_DATABASE']
+		change_in_queue = False
+		ignore_change_in_queue = False
 		for key in settingKeys:
 			if key in settings:
 				setattr(self, key, settings[key])
-			
+				if key in ["CRONIO_WORKER_PREFIX", "CRONIO_WORKER_ID"]:
+					change_in_queue = True
+				if key == 'CRONIO_WORKER_QUEUE':
+					ignore_change_in_queue = True
+
+
+		if change_in_queue and not ignore_change_in_queue:
+			self.CRONIO_WORKER_QUEUE = self.CRONIO_WORKER_PREFIX + self.CRONIO_WORKER_ID
 		self.logger_worker = logging.getLogger('cronio_worker')
 		self.logger_worker.setLevel(self.CRONIO_LOGGER_LEVEL)
 		loggerSH = logging.StreamHandler()
@@ -54,80 +63,87 @@ class CronioWorker(object):
 
 		def on_message(self, headers, message):
 			header_message_id = headers['message-id']
-			
-			self.parent.conn.ack(header_message_id,self.parent.CRONIO_WORKER_ID)
-			message_obj = json.loads(message)
-			cmd_id = False
-
-			for req in ['cmd','type','cmd_id','api_log','sender', 'dependencies']:
-				if req not in message_obj:
-					self.parent.logger_worker.critical('Error - one or many required params are missing... : message-id: %s ' % str(header_message_id))
-					return False
-
-			# These are the passed params in the message, all of them are required, some might be null, still the key must exist in json.
-			cmd = message_obj['cmd']
-			is_type = message_obj['type']
-			cmd_id = message_obj['cmd_id'] 
-			api_log = message_obj['api_log']
-			sender = message_obj['sender']
-			dependencies = message_obj['dependencies']
-			
-			self.parent.sendAPIInform({'type':'info','status':'received','cmd_id': cmd_id, 'message_id':header_message_id, 'message_at': str(datetime.datetime.now())},api_log)
-
-			if 'cmd' in message_obj and 'type' in message_obj:
-				self.parent.logger_worker.debug('New Message Job %s' % str(cmd))
-				if message_obj['type'] == 'operation' and 'cmd' in message_obj:
-					if cmd == 'cleardb':
-						self.parent.clearDatabase()
-						self.parent.sendAPILog(0,{'out':'DB Cleared','error':'','exception':''}, cmd, api_log)
-					else:
-						self.parent.sendAPILog(10002,{'out':'','error':'Invalid Operation','exception':''}, cmd, api_log)
-						self.parent.logger_worker.debug('Error - Invalid operation cmd %s - message-id: %s ' % (cmd,str(header_message_id)))
-			
-
-			
-
-			# Check Dependencies inside the add command to db
-			commandAddedPK = self.parent.addCommandToDB(cmd_id, cmd, is_type, sender, dependencies, api_log)
-			self.parent.logger_worker.debug('Worker removed "%s" from queue' % header_message_id)
-
-			if not commandAddedPK:
-				# Will not process command if dependency check fails
-				self.parent.logger_worker.debug('Worker will not process "%s" dependency_check_failed to execute (one or more.)' % cmd_id)
-				self.parent.sendAPILog(10001,{'out':'','error':'Dependency Failed','exception':''}, cmd_id, api_log)
-				self.parent.sendLog({'log':'', 'error': 'Dependency Failed' },cmd_id)
-			
-			elif message_obj['type'] == "python":
-				# python cmd
-
-				if "\n" in message_obj['cmd']:
-					# this contains multiple commands, will use the os command to execute the temp python file that will be created.
-					tmpfilepath = self.parent.writeToTemp(message_obj['cmd'])
-					
-					# TODO - needs to get the executable of python
-					self.parent.logger_worker.debug('Executing with Python2.7 "%s"' % tmpfilepath)
-					self.parent.ifOSRun(["/usr/bin/python2.7",tmpfilepath], cmd_id, message_obj)
-					
-					self.parent.logger_worker.debug('Removing file "%s"' % tmpfilepath)
-					# remove the tmp file if you want to, if not comment it out
-					os.remove(tmpfilepath)
-				else:
-					self.parent.ifPythonRun(message_obj['cmd'], cmd_id, message_obj)
+			try:				
 				
-				# Remove the command from DB and add it to log
-				self.parent.removeCommandFromDB(commandAddedPK)
-
-			elif message_obj['type'] == "os":
-
-				# os cmd
-				self.parent.logger_worker.debug('Executing commands "%s"' % message_obj['cmd'])
-				if " " in message_obj['cmd']:
-					cmds = message_obj['cmd'].split(" ")
+				if headers['destination'] == self.parent.CRONIO_WORKER_DEPENDANCY:
+					self.parent.addDependancyMessage(message_obj, headers)
+					self.parent.conn.ack(header_message_id, self.parent.CRONIO_WORKER_ID)
 				else:
-					cmds = [message_obj['cmd']]
-				self.parent.ifOSRun(cmds, cmd_id, message_obj)
-				# Remove the command from DB and add it to log
-				self.parent.removeCommandFromDB(commandAddedPK)
+					self.parent.conn.ack(header_message_id, self.parent.CRONIO_WORKER_ID)
+					message_obj = json.loads(message)
+					cmd_id = False
+
+					for req in ['cmd','type','cmd_id','api_log','sender', 'dependencies']:
+						if req not in message_obj:
+							self.parent.logger_worker.critical('Error - one or many required params are missing... : message-id: %s ' % str(header_message_id))
+							return False
+
+					# These are the passed params in the message, all of them are required, some might be null, still the key must exist in json.
+					cmd = message_obj['cmd']
+					is_type = message_obj['type']
+					cmd_id = message_obj['cmd_id'] 
+					api_log = message_obj['api_log']
+					sender = message_obj['sender']
+					dependencies = message_obj['dependencies']
+					
+					self.parent.sendAPIInform({'type':'info','status':'received','cmd_id': cmd_id, 'message_id':header_message_id, 'message_at': str(datetime.datetime.now())},api_log)
+
+					if 'cmd' in message_obj and 'type' in message_obj:
+						self.parent.logger_worker.debug('New Message Job %s' % str(cmd))
+						if message_obj['type'] == 'operation' and 'cmd' in message_obj:
+							if cmd == 'cleardb':
+								self.parent.clearDatabase()
+								self.parent.sendAPILog(0,{'out':'DB Cleared','error':'','exception':''}, cmd, api_log)
+							else:
+								self.parent.sendAPILog(10002,{'out':'','error':'Invalid Operation','exception':''}, cmd, api_log)
+								self.parent.logger_worker.debug('Error - Invalid operation cmd %s - message-id: %s ' % (cmd,str(header_message_id)))
+
+					# Check Dependencies inside the add command to db
+					commandAddedPK = self.parent.addCommandToDB(cmd_id, cmd, is_type, sender, dependencies, api_log)
+					self.parent.logger_worker.debug('Worker removed "%s" from queue' % header_message_id)
+
+					if not commandAddedPK:
+						# Will not process command if dependency check fails
+						self.parent.logger_worker.debug('Worker will not process "%s" dependency_check_failed to execute (one or more.)' % cmd_id)
+						self.parent.sendAPILog(10001,{'out':'','error':'Dependency Failed','exception':''}, cmd_id, api_log)
+						self.parent.sendLog({'log':'', 'error': 'Dependency Failed' },cmd_id)
+					
+					elif message_obj['type'] == "python":
+						# python cmd
+
+						if "\n" in message_obj['cmd']:
+							# this contains multiple commands, will use the os command to execute the temp python file that will be created.
+							tmpfilepath = self.parent.writeToTemp(message_obj['cmd'])
+							
+							# TODO - needs to get the executable of python
+							self.parent.logger_worker.debug('Executing with Python2.7 "%s"' % tmpfilepath)
+							self.parent.ifOSRun(["/usr/bin/python2.7",tmpfilepath], cmd_id, message_obj)
+							
+							self.parent.logger_worker.debug('Removing file "%s"' % tmpfilepath)
+							# remove the tmp file if you want to, if not comment it out
+							os.remove(tmpfilepath)
+						else:
+							self.parent.ifPythonRun(message_obj['cmd'], cmd_id, message_obj)
+						
+						# Remove the command from DB and add it to log
+						self.parent.removeCommandFromDB(commandAddedPK)
+
+					elif message_obj['type'] == "os":
+
+						# os cmd
+						self.parent.logger_worker.debug('Executing commands "%s"' % message_obj['cmd'])
+						if " " in message_obj['cmd']:
+							cmds = message_obj['cmd'].split(" ")
+						else:
+							cmds = [message_obj['cmd']]
+						self.parent.ifOSRun(cmds, cmd_id, message_obj)
+						# Remove the command from DB and add it to log
+						self.parent.removeCommandFromDB(commandAddedPK)
+
+			except Exception as e:
+				self.parent.conn.nack(header_message_id, self.parent.CRONIO_WORKER_ID)
+				# TODO Fix error to go in log and test, try sending it to sender as well.
+				raise e
 
 
 
@@ -137,7 +153,6 @@ class CronioWorker(object):
 		# By default, viewer logs are disabled in messages.
 		self.CRONIO_EXCHANGE_LOG_INFO =  False#"cronio_log_info"
 		self.CRONIO_EXCHANGE_LOG_ERROR =  False#"cronio_log_error"
-		self.CRONIO_WORKER_QUEUE =  "cronio_queue"
 		self.CRONIO_AMQP_HOST =  'localhost'
 		self.CRONIO_AMQP_VHOST =  '/'
 		self.CRONIO_AMQP_PORT =  61613
@@ -147,7 +162,12 @@ class CronioWorker(object):
 		self.CRONIO_ENGINE_RUNTIME_SECONDS = 60
 		self.CRONIO_TEST_IS_NOT_ON = True
 		self.CRONIO_WORKER_WORK_DIR = os.getcwd()
-		self.CRONIO_WORKER_ID = 'worker1'
+		self.CRONIO_WORKER_ID = '1_worker'
+		self.CRONIO_WORKER_PREFIX = '/queue/cronio/workers/'
+		self.CRONIO_WORKER_QUEUE = self.CRONIO_WORKER_PREFIX + self.CRONIO_WORKER_ID
+		# !! NOTICE !! This is to enable the MultiWorker Dependancy (Workers should only be allowed to write to that queue otherwise one worker would be able to send commands to other workers.)
+		# IDEA Permissions Giver ?
+		self.CRONIO_WORKER_DEPENDANCY = '/queue/cronio/workers_dependancy/' + self.CRONIO_WORKER_ID
 		# Enable this in your worker to refresh on each start
 		self.REFRESH_DATABASE = False
 
@@ -163,6 +183,7 @@ class CronioWorker(object):
 		# ack=auto when received removes it from queue
 		# ack='client' make it ack only when told to
 		self.conn.subscribe(destination=self.CRONIO_WORKER_QUEUE, id=self.CRONIO_WORKER_ID, ack='client')
+		self.conn.subscribe(destination=self.CRONIO_WORKER_DEPENDANCY, id=self.CRONIO_WORKER_ID, ack='client')
 
 		# Run for 60 Seconds and stop, can be used to be called in crontab.
 		time.sleep(self.CRONIO_ENGINE_RUNTIME_SECONDS)
