@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys,os,logging
 
-#sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cronio import CronioUtils, CronioWorker, CronioSender
 
@@ -11,7 +11,7 @@ CW = CronioWorker({'CRONIO_AMQP_USERNAME':   "worker1",
 # To Enable Viewer Log, uncomment the below in worker and sender:
 # 'CRONIO_EXCHANGE_LOG_INFO':   "cronio_log_info",
 # 'CRONIO_EXCHANGE_LOG_ERROR':   "cronio_log_error",
-'CRONIO_WORKER_QUEUE':   "cronio_queue",
+'CRONIO_WORKER_ID':   "worker_1",
 'CRONIO_AMQP_HOST':   'localhost',
 'CRONIO_AMQP_VHOST':   '/',
 'CRONIO_AMQP_PORT':   61613,

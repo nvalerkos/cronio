@@ -20,7 +20,7 @@ CS = CronioSender({
 'CRONIO_SENDER_AMQP_VHOST': '/',
 'CRONIO_SENDER_AMQP_PORT': 61613,
 'CRONIO_SENDER_AMQP_USE_SSL': False,
-'CRONIO_SENDER_LOGGER_LEVEL':  logging.INFO, #logging.DEBUG
+'CRONIO_SENDER_LOGGER_LEVEL':  logging.DEBUG, #logging.DEBUG
 'CRONIO_SENDER_LOGGER_FORMATTER': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 'CRONIO_SENDER_RUNTIME_SECONDS': 5})
 
@@ -77,45 +77,45 @@ pprint.pprint(cmd_ids)
 
 # Use those on the following commands:
 # git clone a repo
-CS.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","os",cmd_ids[1])
+CS.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","worker_1","os",cmd_ids[1])
 #execute ls command on the current folder
-CS.sendCMD("ls","os",cmd_ids[2])
+CS.sendCMD("ls","worker_1","os",cmd_ids[2])
 # execute python commands using that repo - you will need to change the sys.path.append.
-CS.sendCMD("import sys\nsys.path.append('/opt/cronio/example/python-crontab')\nfrom crontab import CronTab\ncron = CronTab(user='nikolas')\niter2 = cron.find_comment('comment')  \nfor item2 in iter2:  \n\tprint item2","python",cmd_ids[3],[cmd_ids[2],cmd_ids[1]])
-CS.sendCMD("print 'hello'","python",cmd_ids[3],None)
+CS.sendCMD("import sys\nsys.path.append('/opt/cronio/example/python-crontab')\nfrom crontab import CronTab\ncron = CronTab(user='nikolas')\niter2 = cron.find_comment('comment')  \nfor item2 in iter2:  \n\tprint item2","worker_1","python",cmd_ids[3],[cmd_ids[2],cmd_ids[1]])
+CS.sendCMD("print 'hello'","worker_1","python",cmd_ids[3],None)
 
 
 # Clear Database of its commands
-CS.sendCMD('cleardb','operation',cmd_ids[4])
+CS.sendCMD('cleardb',"worker_1",'operation',cmd_ids[4])
 
 # Workflow Example - Set of commands related with each other.
-commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2]},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None}]
+commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2], "worker_id":"worker_1"},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None, "worker_id":"worker_1"}]
 CS.sendWorkflow(commands)
 
 
-content = {
-	'comment': 'complex data structure we would ideally want in there',
-	'ie.1' : {
-		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
-	},
-	'ie.2' : {
-		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
-	},
-	'ie.3' : {
-		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
-	}
-}
-data = json.dumps(content)
-data = data.encode('hex')
-# !!!!!!!!!!!!!!!!!!!
-# fix the absolute path below
-CS.sendCMD("python /opt/cronio/example/test3.py "+data,"os",cmd_ids[5])
+# content = {
+# 	'comment': 'complex data structure we would ideally want in there',
+# 	'ie.1' : {
+# 		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
+# 	},
+# 	'ie.2' : {
+# 		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
+# 	},
+# 	'ie.3' : {
+# 		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
+# 	}
+# }
+# data = json.dumps(content)
+# data = data.encode('hex')
+# # !!!!!!!!!!!!!!!!!!!
+# # fix the absolute path below
+# CS.sendCMD("python /opt/cronio/example/test3.py "+data,"os",cmd_ids[5])
 
-# Absolute Path only
-PythonFile = "/opt/cronio/examples/test.py"
-CmdFile = "/opt/cronio/examples/test.sh"
+# # Absolute Path only
+# PythonFile = "/opt/cronio/examples/test.py"
+# CmdFile = "/opt/cronio/examples/test.sh"
 
-CS.sendPythonFile(PythonFile,1)
-CS.sendCmdFile(CmdFile,2)
+# CS.sendPythonFile(PythonFile,1)
+# CS.sendCmdFile(CmdFile,2)
 
 time.sleep(10)
