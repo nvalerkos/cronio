@@ -3,10 +3,12 @@ import time, sys, pprint, json, os, tempfile
 import logging
 import stomp,uuid
 
+from ..utils import CronioUtils
 
 class CronioSender(object):
 	def __init__(self, settings = {}):
 		#Set Default Values
+		self.cronio_utils = CronioUtils()
 		self.assignSenderDefaultValues()
 		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER','CRONIO_SENDER_ID','CRONIO_SENDER_WORKER_PREFIX']
 		for key in settingKeys:
@@ -49,13 +51,20 @@ class CronioSender(object):
 		self.CRONIO_SENDER_LOGGER_LEVEL =  logging.INFO
 		self.CRONIO_SENDER_LOGGER_FORMATTER = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 		self.CRONIO_SENDER_ID = 'sender1'
-		self.CRONIO_SENDER_WORKER_PREFIX = '/queue/cronio/workers/'
-		self.CRONIO_SENDER_API_LOG = 'cronio_api_log_' + self.CRONIO_SENDER_ID
+		self.CRONIO_SENDER_WORKER_PREFIX = 'queue_cronio_workers_'
+		self.CRONIO_SENDER_API_LOG = 'queue_cronio_sender_api_log_' + self.CRONIO_SENDER_ID
 
 
 	def sendCMD(self, cmd, worker_id, is_type = "python", cmd_id=False, dependencies = None):
 		jobSend = {"cmd": cmd, "type": is_type, "cmd_id": cmd_id,'sender':self.CRONIO_SENDER_ID, 'dependencies': dependencies, 'api_log': self.CRONIO_SENDER_API_LOG}
 		self.logger_sender.debug('Sending CMD: %s | To worker_id: %s' % (cmd, worker_id))
+		depCheck = self.cronio_utils.checkDependancyWorkerID(dependencies)
+		if depCheck == 'dict':
+			for dependency in dependencies:
+				dependencyDataCheck = {"type": "operation", "cmd": "inform_dependency_worker", "worker_id": worker_id, "cmd_id": dependency["cmd_id"]}
+				self.conn.send(body=json.dumps(dependencyDataCheck), destination=self.CRONIO_SENDER_WORKER_DEPENDENCY_PREFIX+dependency["worker_id"], vhost=self.CRONIO_SENDER_AMQP_VHOST)
+
+		print self.CRONIO_SENDER_WORKER_PREFIX+worker_id
 		self.conn.send(body=json.dumps(jobSend), destination=self.CRONIO_SENDER_WORKER_PREFIX+worker_id, vhost=self.CRONIO_SENDER_AMQP_VHOST)
 
 	def sendPythonFile(self, pythonFile, worker_id, cmd_id = False, dependencies = None):
@@ -91,7 +100,6 @@ class CronioSender(object):
 			return False
 			
 	def sendWorkflow(self, workflow):
-
 		for cmd in workflow:
 			print cmd
 			self.sendCMD(cmd['cmd'], cmd['worker_id'], cmd['type'], cmd['cmd_id'], cmd['dependencies'])
