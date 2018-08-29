@@ -37,8 +37,9 @@ class CronioSenderListener(stomp.ConnectionListener):
 		# CS.logger_sender.debug('ACK Log - Remove from Queue %s' % str(headers['message-id']))
 		# MESSAGE IS IN JSON
 		message_obj = json.loads(message)
-		if headers['subscription'] == "api_log":
-			pprint.pprint(message_obj)
+		pprint.pprint(message_obj)
+		# if headers['subscription'] == "api_log":
+		# 	pprint.pprint(message_obj)
 		# if headers['subscription'] == "api_log":
 			# This here is where the magic happens
 			# print "API LOG =================================="
@@ -73,25 +74,40 @@ CS.conn.subscribe(destination=CS.CRONIO_SENDER_API_LOG, id="api_log", ack='clien
 
 # You can generate a Unique Identifier for each command, or something else.
 cmd_ids = [str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4())]
-pprint.pprint(cmd_ids)
+# pprint.pprint(cmd_ids)
 
 # Use those on the following commands:
 # git clone a repo
-CS.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","worker_1","os",cmd_ids[1])
+# CS.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","worker_1","os",cmd_ids[1])
 #execute ls command on the current folder
-CS.sendCMD("ls","worker_1","os",cmd_ids[2])
+# CS.sendCMD("ls","worker_1","os",cmd_ids[2])
 # execute python commands using that repo - you will need to change the sys.path.append.
-CS.sendCMD("import sys\nsys.path.append('/opt/cronio/example/python-crontab')\nfrom crontab import CronTab\ncron = CronTab(user='nikolas')\niter2 = cron.find_comment('comment')  \nfor item2 in iter2:  \n\tprint item2","worker_1","python",cmd_ids[3],[cmd_ids[2],cmd_ids[1]])
-CS.sendCMD("print 'hello'","worker_1","python",cmd_ids[3],None)
+# CS.sendCMD("import sys\nsys.path.append('/opt/cronio/example/python-crontab')\nfrom crontab import CronTab\ncron = CronTab(user='nikolas')\niter2 = cron.find_comment('comment')  \nfor item2 in iter2:  \n\tprint item2","worker_1","python",cmd_ids[3],[cmd_ids[2],cmd_ids[1]])
+# CS.sendCMD("print 'hello'","worker_1","python",cmd_ids[3],None)
 
 
 # Clear Database of its commands
 CS.sendCMD('cleardb',"worker_1",'operation',cmd_ids[4])
+CS.sendCMD('cleardb',"worker_2",'operation',cmd_ids[4])
+
 
 # Workflow Example - Set of commands related with each other.
-commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2], "worker_id":"worker_1"},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None, "worker_id":"worker_1"}]
-CS.sendWorkflow(commands)
+# commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2], "worker_id":"worker_1"},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None, "worker_id":"worker_1"}]
+# CS.sendWorkflow(commands)
+dependencies_cmd_100 = [
+	# {"cmd_id" : "99","result_code" : 0, "worker_id" : "worker_4"},
+	# {"cmd_id" : "98","result_code" : 0, "worker_id" : "worker_3"},
+	{"cmd_id" : "97","result_code" : 0, "worker_id" : "worker_2"}
+]
 
+cmds = [
+	{"cmd": "echo 'worker2'", "worker_id": "worker_2", "type": "os", "cmd_id": 97, "dependencies": None}, 
+	# {"cmd": "echo 'worker3'", "worker_id": "worker_3", "type": "os", "cmd_id": 98, "dependencies": None},
+	# {"cmd": "print \"hello cronio\"", "worker_id": "worker_4", "type": "python", "cmd_id": 99,"dependencies" : None},
+	{"cmd": "echo 'worker1'", "worker_id": "worker_1", "type": "os", "cmd_id": 100, "dependencies": dependencies_cmd_100},
+]
+
+CS.sendWorkflow(cmds)
 
 # content = {
 # 	'comment': 'complex data structure we would ideally want in there',
