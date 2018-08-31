@@ -16,4 +16,4 @@ RUN touch /var/log/cron.log
 RUN mkdir -p /opt/cronio
 ADD cronio_worker.py /opt/cronio/
 # Run the command on container startup
-CMD cron && tail -f /var/log/cron.log
+RUN service cron start

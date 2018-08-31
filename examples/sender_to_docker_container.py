@@ -64,15 +64,6 @@ CS.initConnectSenderSTOMP()
 # CS.conn.subscribe(destination=CS.CRONIO_SENDER_EXCHANGE_LOG_ERROR, id="view_error", ack='client')
 CS.conn.subscribe(destination=CS.CRONIO_SENDER_API_LOG, id="api_log", ack='client')
 
-# IF YOU WANT TO UNSUBSCRIBE
-# c.subscribe('/queue/test', 123)
-# c.unsubscribe(123)
-# FOR MORE CHECK STOMP-PY DOCS - http://jasonrbriggs.github.io/stomp.py/api.html#sending-and-receiving-messages
-
-#clone git directory
-
-
-# You can generate a Unique Identifier for each command, or something else.
 cmd_ids = [str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4())]
 # pprint.pprint(cmd_ids)
 
@@ -83,17 +74,12 @@ cmd_ids = [str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4(
 # CS.sendCMD("ls","worker_1","os",cmd_ids[2])
 # execute python commands using that repo - you will need to change the sys.path.append.
 # CS.sendCMD("import sys\nsys.path.append('/opt/cronio/example/python-crontab')\nfrom crontab import CronTab\ncron = CronTab(user='nikolas')\niter2 = cron.find_comment('comment')  \nfor item2 in iter2:  \n\tprint item2","worker_1","python",cmd_ids[3],[cmd_ids[2],cmd_ids[1]])
-CS.sendCMD("print 'hello'","worker_1","python",cmd_ids[3],None)
 
-
-# Clear Database of its commands
 CS.sendCMD('cleardb',"worker_1",'operation',cmd_ids[4])
-# CS.sendCMD('cleardb',"worker_2",'operation',cmd_ids[4])
 
-# CS.sendCMD('ps -ax',"worker_1",'os',cmd_ids[4])
-# Workflow Example - Set of commands related with each other.
-# commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2], "worker_id":"worker_1"},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None, "worker_id":"worker_1"}]
-# CS.sendWorkflow(commands)
+# CS.sendCMD("print 'hello'","worker_1","python",cmd_ids[3],None)
+
+
 dependencies_cmd_100 = [
 	# {"cmd_id" : "99","result_code" : 0, "worker_id" : "worker_4"},
 	# {"cmd_id" : "98","result_code" : 0, "worker_id" : "worker_3"},
@@ -107,31 +93,17 @@ cmds = [
 	{"cmd": "echo 'worker1'", "worker_id": "worker_1", "type": "os", "cmd_id": 100, "dependencies": dependencies_cmd_100},
 ]
 
+
+install_apt_packages = """
+import os
+os.environ['PATH']='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+os.system('apt-get update')
+os.system('apt-get install -y python-mysqldb')
+"""
+
+CS.sendCMD(install_apt_packages,"worker_1","python","apt-install-mysqldb",None)
+# CS.sendCMD("pip install mysql-python","worker_1","os","pip-install-mysqldb",None)
 # CS.sendWorkflow(cmds)
-
-# content = {
-# 	'comment': 'complex data structure we would ideally want in there',
-# 	'ie.1' : {
-# 		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
-# 	},
-# 	'ie.2' : {
-# 		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
-# 	},
-# 	'ie.3' : {
-# 		'key': 'is value bla bla', 'value' : [1,2,3,4,5,6,7,10011]
-# 	}
-# }
-# data = json.dumps(content)
-# data = data.encode('hex')
-# # !!!!!!!!!!!!!!!!!!!
-# # fix the absolute path below
-# CS.sendCMD("python /opt/cronio/example/test3.py "+data,"os",cmd_ids[5])
-
-# # Absolute Path only
-# PythonFile = "/opt/cronio/examples/test.py"
-# CmdFile = "/opt/cronio/examples/test.sh"
-
-# CS.sendPythonFile(PythonFile,1)
-# CS.sendCmdFile(CmdFile,2)
-
+PythonFile = "docker/backup_db_file.py"
+CS.sendPythonFile(PythonFile,"worker_1")
 time.sleep(10)
