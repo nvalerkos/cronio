@@ -10,7 +10,7 @@ class CronioSender(object):
 		#Set Default Values
 		self.cronio_utils = CronioUtils()
 		self.assignSenderDefaultValues()
-		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER','CRONIO_SENDER_ID','CRONIO_SENDER_WORKER_PREFIX']
+		settingKeys = ['CRONIO_SENDER_EXCHANGE_LOG_INFO','CRONIO_SENDER_EXCHANGE_LOG_ERROR','CRONIO_SENDER_AMQP_USERNAME','CRONIO_SENDER_AMQP_PASSWORD','CRONIO_SENDER_WORKER_QUEUE','CRONIO_SENDER_AMQP_HOST','CRONIO_SENDER_AMQP_VHOST','CRONIO_SENDER_AMQP_PORT','CRONIO_SENDER_AMQP_USE_SSL','CRONIO_SENDER_LOGGER_LEVEL','CRONIO_SENDER_LOGGER_FORMATTER','CRONIO_SENDER_ID','CRONIO_SENDER_WORKER_PREFIX','CRONIO_SENDER_WORKER_DEPENDENCY_PREFIX']
 		for key in settingKeys:
 			if key in settings:
 				setattr(self, key, settings[key])
@@ -52,16 +52,19 @@ class CronioSender(object):
 		self.CRONIO_SENDER_LOGGER_FORMATTER = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 		self.CRONIO_SENDER_ID = 'sender1'
 		self.CRONIO_SENDER_WORKER_PREFIX = 'queue_cronio_workers_'
+		self.CRONIO_SENDER_WORKER_DEPENDENCY_PREFIX = 'queue_cronio_workers_dependency_'
 		self.CRONIO_SENDER_API_LOG = 'queue_cronio_sender_api_log_' + self.CRONIO_SENDER_ID
 
 
 	def sendCMD(self, cmd, worker_id, is_type = "python", cmd_id=False, dependencies = None):
-		jobSend = {"cmd": cmd, "type": is_type, "cmd_id": cmd_id,'sender':self.CRONIO_SENDER_ID, 'dependencies': dependencies, 'api_log': self.CRONIO_SENDER_API_LOG}
+		jobSend = {"cmd": cmd, "type": is_type, "cmd_id": cmd_id,'sender_id':self.CRONIO_SENDER_ID, 'dependencies': dependencies, 'api_log': self.CRONIO_SENDER_API_LOG}
 		self.logger_sender.debug('Sending CMD: %s | To worker_id: %s' % (cmd, worker_id))
 		depCheck = self.cronio_utils.checkDependancyWorkerID(dependencies)
 		if depCheck == 'dict':
 			for dependency in dependencies:
-				dependencyDataCheck = {"type": "operation", "cmd": "inform_dependency_worker", "worker_id": worker_id, "cmd_id": dependency["cmd_id"]}
+				
+				dependencyDataCheck = {"type": "operation", "cmd": "inform_dependency_worker", "worker_id": worker_id, "cmd_id": dependency["cmd_id"], "api_log": self.CRONIO_SENDER_API_LOG, "sender_id": self.CRONIO_SENDER_ID}
+				self.logger_sender.debug('Sending dependency check: %s | To worker_id: %s | Inform worker_id: %s' % (str(dependency), str(dependency["worker_id"]), str(worker_id)))
 				self.conn.send(body=json.dumps(dependencyDataCheck), destination=self.CRONIO_SENDER_WORKER_DEPENDENCY_PREFIX+dependency["worker_id"], vhost=self.CRONIO_SENDER_AMQP_VHOST)
 
 		print self.CRONIO_SENDER_WORKER_PREFIX+worker_id

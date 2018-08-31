@@ -92,4 +92,5 @@ ENV/
 
 
 #cronio specific
-examples/croniodb
+examples/croniodb.*
+examples/*.sqlite

@@ -9,6 +9,8 @@ INTRO
 - [x] Prototype - Send some commands in OS or in Python and execute them, bring back the log or errors if any
 - [x] Package Structure
 - [x] Dependent Commands ie. dependancy: [1,2,3,200, cmd_id]
+- [ ] Multiple Workers with one Sender, dependency on different workers to run a task with negation. 
+ie. Complete Task A on Worker 1, and when done do Task B on Worker 2. If not done, do Task C on Worker 3.
 - [ ] Time to be executed ie. using python-crontab would be a good thing
 - [ ] ENVs needs to be tested with docker that it can be set and read from this app.py
 
@@ -84,6 +86,16 @@ ie.
 > Hence that, the CRONIO_WORKER_QUEUE param in class and settings needs to be avoided if you want to have the multiworker dependancy to work. Otherwise we will need to add namespaces for it. Which are going a bit off topic.
 > Ensure that you set CRONIO_WORKER_ID and CRONIO_WORKER_PREFIX on each worker and have the same CRONIO_WORKER_PREFIX in all workers. Avoid using CRONIO_WORKER_ID in the format: worker1 and worker11 otherwise you might end up having difficulty setting permissions for specific workers.
 
+
+## Dependency Checks
+
+Each worker (ie. worker_1) has a specific log which receives notices when one a workers job (ie. worker_2) has finished which is a dependency on the other worker (ie. worker_1). 
+ie.
+
+	queue_cronio_workers_dependency_worker_1
+
+
+	
 
 ## Execute OS commands and pass a cmd_id (ID)
 
