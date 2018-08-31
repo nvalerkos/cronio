@@ -15,5 +15,5 @@ RUN chmod 0644 /etc/cron.d/hello-cron
 RUN touch /var/log/cron.log
 RUN mkdir -p /opt/cronio
 ADD cronio_worker.py /opt/cronio/
-# Run the command on container startup
-RUN service cron start
+# Add the command "service cron start" to docker entrypoint.
+RUN sed -i '2iservice cron start' /usr/local/bin/docker-entrypoint.sh
