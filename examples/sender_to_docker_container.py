@@ -102,8 +102,26 @@ os.system('apt-get install -y python-mysqldb')
 """
 
 CS.sendCMD(install_apt_packages,"worker_1","python","apt-install-mysqldb",None)
+checkENVs = """
+import os, pprint
+pprint.pprint(os.environ)
+"""
+# CS.sendCMD(checkENVs,"worker_1","python","checkenvs",None)
+# show envs variables of process (525 is the pid)
+# CS.sendCMD("cat /proc/525/environ", "worker_1", "os", "checkenv", None)
+
+CS.sendCMD("pip install envparse","worker_1","os","checkenvs",None)
+
+
+checkENVs = """
+from envparse import env
+env.read_envfile("/root/.env")
+print "hostname is " + str(env('HOSTNAME',default='localhost'))
+"""
+CS.sendCMD(checkENVs,"worker_1","python","checkenvs",None)
+
 # CS.sendCMD("pip install mysql-python","worker_1","os","pip-install-mysqldb",None)
 # CS.sendWorkflow(cmds)
 PythonFile = "docker/backup_db_file.py"
-CS.sendPythonFile(PythonFile,"worker_1")
+# CS.sendPythonFile(PythonFile,"worker_1")
 time.sleep(10)
