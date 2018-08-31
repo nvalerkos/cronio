@@ -90,7 +90,7 @@ cmd_ids = [str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4(
 CS.sendCMD('cleardb',"worker_1",'operation',cmd_ids[4])
 CS.sendCMD('cleardb',"worker_2",'operation',cmd_ids[4])
 
-
+# CS.sendCMD('ps -ax',"worker_1",'os',cmd_ids[4])
 # Workflow Example - Set of commands related with each other.
 # commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None, "worker_id":"worker_1"}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2], "worker_id":"worker_1"},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None, "worker_id":"worker_1"}]
 # CS.sendWorkflow(commands)
@@ -107,7 +107,7 @@ cmds = [
 	{"cmd": "echo 'worker1'", "worker_id": "worker_1", "type": "os", "cmd_id": 100, "dependencies": dependencies_cmd_100},
 ]
 
-CS.sendWorkflow(cmds)
+# CS.sendWorkflow(cmds)
 
 # content = {
 # 	'comment': 'complex data structure we would ideally want in there',

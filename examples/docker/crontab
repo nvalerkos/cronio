@@ -1,0 +1,1 @@
+* * * * * root python /opt/cronio/cronio_worker.py >> /var/log/cron.log 2>&1

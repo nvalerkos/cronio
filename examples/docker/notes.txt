@@ -1,0 +1,1 @@
+docker run --name testdb -e MYSQL_ROOT_PASSWORD=guest -d test_db
