@@ -58,7 +58,7 @@ class Commands(Base):
 
 
 """
-Own Commands that our commands depend on from Other Workers or Own.
+Own Commands that our commands depend on from Other Workers/Own.
 """
 class OwnCommandsThatDependOn(Base):
 	__tablename__ = 'own_commands_depend_on'
