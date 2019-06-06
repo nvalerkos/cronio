@@ -7,12 +7,11 @@ import stomp
 module_logger_worker = logging.getLogger("cronio_worker")
 
 ### Database - SQLite
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, desc, exists
 from sqlalchemy.pool import StaticPool
-from sqlalchemy.orm import relationship, sessionmaker, scoped_session
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import relationship, sessionmaker, scoped_session, sessionmaker
 
-from .models import Base, Commands, CommandLog, CommandDeps
+from .models import Base, Commands, CommandLog, CommandDeps, CommandDepsChecks
 from ..utils import CronioUtils
 
 class CronioWorker(object):
@@ -100,7 +99,6 @@ class CronioWorker(object):
 						self.parent.logger_worker.debug("Clearing Database")
 						self.parent.sendAPILog(0,{"out":"DB Cleared","error":"","exception":""}, cmd, api_log)
 					elif cmd == "inform_dependency_worker" and headers["destination"] == "/queue/"+self.parent.CRONIO_WORKER_DEPENDENCY_OWN:
-
 						self.parent.logger_worker.debug("inform_dependency_worker cmd_id: %s  worker_id: %s" % (str(cmd_id), str(message_obj['worker_id'])))
 						self.parent.sendDependencyResultToWorker(message_obj, api_log)
 					elif cmd == "dependency_result" and headers["destination"] == "/queue/"+self.parent.CRONIO_WORKER_DEPENDENCY_OWN:
@@ -115,6 +113,7 @@ class CronioWorker(object):
 					self.parent.logger_worker.debug("Worker removed \"%s\" from queue" % header_message_id)
 					commandAddedPK = self.parent.addCommandAndDependiesOfOtherWorkersToDB(cmd_id, cmd, is_type, sender_id, dependencies, api_log)
 					self.parent.checkWorkersDependenciesRunIfOK(cmd_id)
+					self.parent.checkWorkersNotificationsOfCommands()
 # Disabled currently using the def checkWorkersDependenciesRunIfOK the below commented out should be removed.
 					# if dependeciesNotOK:
 					# 	# Will not process command if dependency check fails
@@ -162,6 +161,40 @@ class CronioWorker(object):
 			# 	raise e
 
 
+	def checkWorkersNotificationsOfCommands(self):
+		commandsFound = self.session.query(CommandLog).filter(exists().where(CommandDepsChecks.cmd_id==CommandLog.cmd_id)).order_by(CommandLog.executed_date.desc()).all()
+		for commandFound in commandsFound:
+			print commandsFound.cmd_id
+		# if commandFound:
+		# 	if commandFound.dependencies == "":
+		# 		self.runCMDFromDB(cmd_id)
+		# 	else:
+		# 		checkResolvedMissing = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='No').first()
+		# 		if checkResolvedMissing:
+		# 			# Dependencies still have not been resolved.
+		# 			return False
+		# 		else:
+		# 			# Dependencies all have been resolved.
+		# 			checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=False).all()
+		# 			commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id).first()
+		# 			api_log = commandFound.api_log
+		# 			if checkResolvedAll:
+		# 				# Send message to sender_id due to failed dependencies, will not run.
+		# 				ERROR = "Failed Dependency - Will not run command with cmd_id \"%s\"" % str(cmd_id)
+		# 				self.logger_worker.critical(ERROR)
+		# 				self.sendAPILog(1,{"out":"","error":str(ERROR),"exception":""},cmd_id, api_log)
+		# 				self.sendLog({"log":"", "error": ERROR },cmd_id)
+		# 			else:
+		# 				checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
+		# 				if checkResolvedAll:
+		# 					self.runCMDFromDB(cmd_id)
+		# 					self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
+		# else:
+		# 	ERROR = "Could not find command with cmd_id: %s " % cmd_id
+		# 	self.logger_worker.critical(ERROR)
+		# return False
+
+
 	def checkWorkersDependenciesRunIfOK(self, cmd_id):
 		commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id, status="pending").first()
 		if commandFound:
@@ -187,6 +220,7 @@ class CronioWorker(object):
 						checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
 						if checkResolvedAll:
 							self.runCMDFromDB(cmd_id)
+							self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
 		else:
 			ERROR = "Could not find command with cmd_id: %s " % cmd_id
 			self.logger_worker.critical(ERROR)
@@ -373,6 +407,17 @@ class CronioWorker(object):
 		commandLogNew = CommandLog(cmd_id=cmd_id, cmd=json.dumps(cmd),is_type=is_type, sender_id=sender_id, dependencies=json.dumps(dependencies), result_code=result_code, api_log=api_log)
 		self.session.add(commandLogNew)
 		self.session.commit()
+
+# Added, not sure if we also want to send an update message to get the dependency again, probably yes!
+	def updateCommandLog(self, cmd_id, result_code):
+		commandLogEdit = self.session.query(CommandLog).filter_by(cmd_id=cmd_id).first()
+		# CommandLog(cmd_id=cmd_id, cmd=json.dumps(cmd),is_type=is_type, sender_id=sender_id, dependencies=json.dumps(dependencies), result_code=result_code, api_log=api_log)
+		if commandLogFound:
+			commandLogEdit.result_code = result_code
+			self.logger_worker.debug("Update of cmd_id: %s with result_code: %s",str(cmd_id), str(result_code))	
+			self.session.commit()
+		else:
+			self.logger_worker.debug("Did not find cmd in database to update it. cmd_id: %s",cmd_id)	
 		
 	def writeToTemp(self, cmds):
 		# Handle opening the file yourself. This makes clean-up
@@ -465,6 +510,12 @@ class CronioWorker(object):
 		self.sendAPIInform({"dependency_data":data, "worker_id": worker_id ,"message_at": str(datetime.datetime.now())},api_log)
 		self.conn.send(body=json.dumps(data), destination=self.CRONIO_WORKER_DEPENDENCY_PREFIX + worker_id, vhost=self.CRONIO_AMQP_VHOST)
 
+	def addToCommandDepsChecks(self, cmd_id, worker_id, sender_id):
+		CommandDepsChecksNew = CommandDepsChecks(cmd_id=cmd_id, sender_id=sender_id, worker_id=worker_id )
+		self.session.add(CommandDepsChecksNew)
+		self.session.commit()
+
+
 	def sendDependencyResultToWorker(self, message_obj, api_log):
 		# CommandLog(cmd_id=cmd_id, cmd=json.dumps(cmd),is_type=is_type, sender_id=sender_id, dependencies=json.dumps(dependencies), result_code=10001, api_log=api_log)
 		commandLogFound = self.session.query(CommandLog).filter_by(cmd_id=message_obj["cmd_id"]).first()
@@ -473,6 +524,8 @@ class CronioWorker(object):
 		else:
 			# 1003 Could not be found
 			# TODO ERROR Documentation 10003
+			self.logger_worker.debug("Not found or not received yet, put it in db and wait for it. cmd_id: %s  and worker_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"]))
+			self.addToCommandDepsChecks(message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"])
 			self.sendAPIInformWorkerDependencyResult(message_obj["cmd_id"],message_obj["worker_id"], 10003, api_log, message_obj["sender_id"])
 			self.sendAPIInform({"dependency_data":message_obj, "result_code": 10003, "message": "Could not find CMD ID in Database.","message_at": str(datetime.datetime.now())},api_log)
 			self.sendAPILog(10003,{"out":message_obj,"error":"Could not find CMD in Database","exception":""}, message_obj["cmd_id"], api_log)

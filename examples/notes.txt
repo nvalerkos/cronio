@@ -1,0 +1,53 @@
+Dependencies on Other Workers:
+	. Notify Worker 1 of Dependency on their job of Worker 2
+
+Sender will send:
+	. To Worker 1 to inform Worker 2 of cmd_id result 
+	( queue_cronio_workers_worker_1 )
+
+	with Inform ie:
+
+
+	. To Worker 2 that the cmd_id has a dependency from Worker 1
+	( queue_cronio_workers_dependency_worker_2 )
+	
+	. Notify Worker 2 of Result of work done from Worker 1
+
+	. Check if the Worker is the same one skip the dependency?
+	
+Commands
+CommandDeps
+CommandDepsChecks
+CommandLog
+
+
+S -> W1, 1, D()
+- W1->1-> DB  Commands Table
+	Add Command to Commands Table will stay there until is resulted to something
+
+S -> W1, Inform(W2,1)
+- W1->I(W2,1)-> DB 
+	CommandDeps Table will stay there until it finishes command 1 and send it to Worker 2
+
+[ W1, 1, Done(0) ]
+	Remove Command from Commands
+	Add Command to CommandLog
+	Check CommandDeps
+		If there is an entry send it to Workers needed to receive notification for.
+		Remove it when it is send to them.
+
+
+S -> W2, 2, D(W1,1)
+- W2 Check (W1,1) -> DB Check first CommandDepsChecks Table
+	Received a job
+	Add it to Commands Table
+	Check if it can be executed from the dependencies.
+
+
+W1 -> W2, Result(W1,1)
+- W2 Check (W1,1) -> DB Check first CommandDepsChecks Table
+	Received notification of Result of a command
+	Check Deps.
+
+
+
