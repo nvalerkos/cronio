@@ -4,6 +4,10 @@ INTRO
 
 >This project has a sender and a receiver, the sender sends commands through RabbitMQ on the queue of a worker (receiver), the receiver executes them either with OS or Python2.7
 
+## NOTE
+
+>Following a test I did, I discovered many issues maintaining the code, I started recode the whole thing because it was not an easy thing to understand, my plan is to finish it as soon as possible and be able to make easy to understand.
+
 ## Objectives
 
 - [x] Prototype - Send some commands in OS or in Python and execute them, bring back the log or errors if any
