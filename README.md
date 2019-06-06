@@ -6,7 +6,7 @@ INTRO
 
 ## NOTE
 
->Following a test I did, I discovered many issues maintaining the code, I started recode the whole thing because it was not an easy thing to understand, my plan is to finish it as soon as possible and be able to make easy to understand.
+>Following a test I did, I discovered many issues maintaining the code, I started recode the whole thing because it was not an easy thing to understand, my plan is to finish it as soon as possible and be able to make as easy as possible to understand.
 
 ## Objectives
 
