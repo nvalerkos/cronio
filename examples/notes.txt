@@ -14,11 +14,6 @@ Sender will send:
 	. Notify Worker 2 of Result of work done from Worker 1
 
 	. Check if the Worker is the same one skip the dependency?
-	
-Commands
-CommandDeps
-CommandDepsChecks
-CommandLog
 
 
 S -> W1, 1, D()

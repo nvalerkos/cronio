@@ -68,9 +68,9 @@ CS.conn.disconnect()
 CS.conn.remove_listener('default')
 CS.cronio_sender_listener = CronioSenderListener() 
 CS.initConnectSenderSTOMP()
-# CS.sendCMD('cleardb',WORKER_ID,'operation',0)
-# CS.sendCMD('echo "1"',WORKER_ID,'os',1)
-# CS.sendCMD('echo "2"',WORKER_ID,'os',2)
+CS.sendCMD('cleardb',WORKER_ID,'operation',0)
+CS.sendCMD('echo "1"',WORKER_ID,'os',1)
+CS.sendCMD('echo "2"',WORKER_ID,'os',2)
 # CS.sendCMD('echo "3"',WORKER_ID,'os',3)
 
 dependencies_cmd_4 = [
@@ -78,6 +78,7 @@ dependencies_cmd_4 = [
 	{"cmd_id" : 2,"result_code" : 0, "worker_id" : WORKER_ID},
 	# {"cmd_id" : 3,"result_code" : 0, "worker_id" : WORKER_ID}
 ]
+
 
 CS.sendCMD('echo "4"',WORKER_ID,'os',4, dependencies_cmd_4)
 # CS.sendCMD('echo "6"',WORKER_ID,'os',6)
