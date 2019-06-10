@@ -109,7 +109,9 @@ class CronioWorker(object):
 					elif cmd == "dependency_result" and headers["destination"] == "/queue/"+self.parent.CRONIO_WORKER_DEPENDENCY_OWN:
 						self.parent.logger_worker.debug("Received Dependency Result cmd_id: %s  worker_id: %s" % (str(cmd_id), str(message_obj['worker_id'])))
 						self.parent.DependencyResolved(cmd_id, message_obj['result_code'], message_obj['worker_id'], sender_id)
-
+						cmdsWhichDependencyAffects = self.parent.session.query(OwnCommandsThatDependOn).filter_by(depends_on_cmd_id=cmd_id,depends_on_worker_id=message_obj['worker_id'],sender_id=sender_id).all()
+						for cmdWhichDependencyAffects in cmdsWhichDependencyAffects:
+							self.parent.CheckWorkersDependenciesRunIfOK(cmdWhichDependencyAffects.run_cmd_id)
 						# TODO Add this to the db
 					else:
 						# TODO ERROR Documentation 10002

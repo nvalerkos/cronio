@@ -62,12 +62,11 @@ class CronioSender(object):
 		depCheck = self.cronio_utils.checkDependancyWorkerID(dependencies)
 		if depCheck == 'dict':
 			for dependency in dependencies:
-				
-				dependencyDataCheck = {"type": "operation", "cmd": "inform_dependency_worker", "worker_id": worker_id, "cmd_id": dependency["cmd_id"], "api_log": self.CRONIO_SENDER_API_LOG, "sender_id": self.CRONIO_SENDER_ID}
+				dependencyDataCheck = {"type": "operation", "cmd": "inform_dependency_worker", "worker_id": str(worker_id), "cmd_id": dependency["cmd_id"], "api_log": self.CRONIO_SENDER_API_LOG, "sender_id": self.CRONIO_SENDER_ID}
 				if (str(dependency["worker_id"]) == str(worker_id) ):
 					self.logger_sender.debug('Skipping sending inform, same worker_id! worker_id: %s' % (worker_id))
 				else:
-					self.logger_sender.debug('Sending dependency check: %s | To worker_id: %s | Inform worker_id: %s' % (str(dependency), str(dependency["worker_id"]), str(worker_id)))
+					self.logger_sender.debug('Sending dependency check: %s | To: %s | Inform: %s | %s' % (str(dependency), str(dependency["worker_id"]), str(worker_id), self.CRONIO_SENDER_WORKER_DEPENDENCY_PREFIX+dependency["worker_id"]))
 					self.conn.send(body=json.dumps(dependencyDataCheck), destination=self.CRONIO_SENDER_WORKER_DEPENDENCY_PREFIX+dependency["worker_id"], vhost=self.CRONIO_SENDER_AMQP_VHOST)
 
 		print self.CRONIO_SENDER_WORKER_PREFIX+worker_id

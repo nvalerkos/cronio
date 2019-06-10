@@ -81,7 +81,7 @@ class OwnCommandsThatDependOn(Base):
 	"""
 	resulted_result_code = Column(Integer, default=0, nullable=False)
 	resulted_datetime = Column(DATETIME, nullable=True)
-	__table_args__ = (UniqueConstraint('sender_id', 'depends_on_worker_id', 'depends_on_cmd_id','depends_on_result_code', name='own_commands_depend_on_uix_1'),)
+	__table_args__ = (UniqueConstraint('sender_id', 'depends_on_worker_id', 'depends_on_cmd_id','depends_on_result_code', 'run_cmd_id', name='own_commands_depend_on_uix_1'),)
 
 
 """
