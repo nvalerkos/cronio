@@ -258,13 +258,9 @@ class CronioWorker(object):
 						# Send message to sender_id due to failed dependencies, will not run.
 						ERROR = "Failed Dependency - Will not run command with cmd_id \"%s\"" % str(cmd_id)
 						self.logger_worker.critical(ERROR)
-<<<<<<< HEAD
-						self.SendAPILog(1,{"out":"","error":str(ERROR),"exception":""},cmd_id, api_log)
-						self.SendLog({"log":"", "error": ERROR },cmd_id)
-=======
 						self.sendAPILog(1,{"out":"","error":str(ERROR),"exception":""},cmd_id, api_log)
 						self.sendLog({"log":"", "error": ERROR },cmd_id)
->>>>>>> cde02e69f0d4b6da4161b8ac6ec02a3d73087910
+
 					else:
 						self.logger_worker.debug("In else, ")
 						checkResolvedAll = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='OK').all()
