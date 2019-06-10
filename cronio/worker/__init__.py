@@ -473,7 +473,6 @@ class CronioWorker(object):
 		status = "Completed"
 		if ERROR != "" or ExceptionError != "":
 			self.logger_worker.debug("  ERROR: %s"% str(ERROR+str(ExceptionError)))
-			status = "Error"
 		if self.CRONIO_TEST_IS_NOT_ON:
 			self.SendAPILog(result_code,{"out":OUT,"error":str(ERROR),"exception":str(ExceptionError)},cmd_id, job_message["api_log"])
 			does_depend_on = True
@@ -551,7 +550,6 @@ class CronioWorker(object):
 		status = "Completed"
 		if ERROR != "" or ExceptionError != "":
 			self.logger_worker.debug("  ERROR: %s"%str(ERROR+str(ExceptionError)))
-			status = "Error"
 		if self.CRONIO_TEST_IS_NOT_ON:
 			self.SendAPILog(result_code,{"out":OUT,"error":ERROR,"exception":ExceptionError},cmd_id, job_message["api_log"])
 			# Removed the add to command log, for simplicity to add it and then remove it from commands.
@@ -643,7 +641,7 @@ class CronioWorker(object):
 			
 		# else, store in the database and wait for it. 
 		else:
-			self.logger_worker.debug("Not found or not Resulted Yet.  cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
+			self.logger_worker.debug("644 Not found or not Resulted Yet.  cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
 	
 
 	def CheckIfCommandAlreadyResultedToSendMessageOrAddItToDB(self, message_obj, api_log):
@@ -656,7 +654,7 @@ class CronioWorker(object):
 			
 		# else, store in the database and wait for it. 
 		else:
-			self.logger_worker.debug("Not found or not Resulted Yet. We will put it in db and wait for it. Old version was giving 10003 error. cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
+			self.logger_worker.debug("657 Not found or not Resulted Yet. We will put it in db and wait for it. Old version was giving 10003 error. cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
 			self.AddToOwnCommandsThatOtherWorkersDependOn(message_obj["cmd_id"], message_obj["worker_id"], api_log, message_obj["sender_id"])
 			# Removed the below, it will stay in the db, will wait for other cmds.
 			# self.SendTheResultToOtherWorkerMarkItAsSent(message_obj["cmd_id"],message_obj["worker_id"], 10003, api_log, message_obj["sender_id"])
