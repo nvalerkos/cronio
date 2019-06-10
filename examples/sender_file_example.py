@@ -77,9 +77,14 @@ CS.conn.disconnect()
 CS.conn.remove_listener('default')
 CS.cronio_sender_listener = CronioSenderListener() 
 CS.initConnectSenderSTOMP()
+
 CS.sendCMD('cleardb',WORKER_ID,'operation',0)
+
 PythonFile = "/opt/cronio/example/test.py"
 CmdFile = "/opt/cronio/example/test.sh"
+
 CS.sendPythonFile(PythonFile,WORKER_ID,1)
+
 CS.sendCmdFile(CmdFile,WORKER_ID,2)
+
 CS.conn.disconnect()
