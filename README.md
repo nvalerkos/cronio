@@ -13,8 +13,9 @@ INTRO
 - [x] Prototype - Send some commands in OS or in Python and execute them, bring back the log or errors if any
 - [x] Package Structure
 - [x] Dependent Commands ie. dependancy: [1,2,3,200, cmd_id]
-- [ ] Multiple Workers with one Sender, dependency on different workers to run a task with negation. 
+- [x] Multiple Workers with one Sender, dependency on different workers to run a task with negation. 
 ie. Complete Task A on Worker 1, and when done do Task B on Worker 2. If not done, do Task C on Worker 3.
+check examples/sender_complex_multi_worker.py
 - [ ] Time to be executed ie. using python-crontab would be a good thing
 - [ ] ENVs needs to be tested with docker that it can be set and read from this app.py
 
