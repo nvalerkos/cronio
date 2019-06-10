@@ -10,6 +10,15 @@ import stomp
 # stomp_logger.setLevel(logging.DEBUG)
 WORKER_ID = "worker_1"
 
+
+"""
+This example will send some commands which will depend on its own worker's cmds result.
+So
+one sender -> one worker scenario
+"""
+
+
+
 CS = CronioSender({
 # To Enable Viewer Log, uncomment the below in worker and sender:
 # 'CRONIO_SENDER_EXCHANGE_LOG_INFO': "cronio_log_info",
@@ -87,12 +96,12 @@ dependencies_cmd_5 = [
 	{"cmd_id" : 4,"result_code" : 0, "worker_id" : WORKER_ID}
 ]
 
-# CS.sendCMD('echo "5"',WORKER_ID,'os',5, dependencies_cmd_5)
+CS.sendCMD('echo "5"',WORKER_ID,'os',5, dependencies_cmd_5)
 
 
 
-# CS.sendCMD('echo "7"',WORKER_ID,'os',7)
-# CS.sendCMD('echo "8"',WORKER_ID,'os',8)
-# CS.sendCMD('echo "9"',WORKER_ID,'os',9)
-# CS.sendCMD('echo "10"',WORKER_ID,'os',10, dependencies_cmd_5)
+CS.sendCMD('echo "7"',WORKER_ID,'os',7)
+CS.sendCMD('echo "8"',WORKER_ID,'os',8)
+CS.sendCMD('echo "9"',WORKER_ID,'os',9)
+CS.sendCMD('echo "10"',WORKER_ID,'os',10, dependencies_cmd_5)
 CS.conn.disconnect()
