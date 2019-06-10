@@ -656,17 +656,9 @@ class CronioWorker(object):
 			
 		# else, store in the database and wait for it. 
 		else:
-<<<<<<< HEAD
 			self.logger_worker.debug("Not found or not Resulted Yet. We will put it in db and wait for it. Old version was giving 10003 error. cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
 			self.AddToOwnCommandsThatOtherWorkersDependOn(message_obj["cmd_id"], message_obj["worker_id"], api_log, message_obj["sender_id"])
 			# Removed the below, it will stay in the db, will wait for other cmds.
 			# self.SendTheResultToOtherWorkerMarkItAsSent(message_obj["cmd_id"],message_obj["worker_id"], 10003, api_log, message_obj["sender_id"])
 			# self.SendAPIInform({"dependency_data":message_obj, "result_code": 10003, "message": "Could not find CMD ID in Database.","message_at": str(datetime.datetime.now())},api_log)
 			# self.SendAPILog(10003,{"out":message_obj,"error":"Could not find CMD in Database","exception":""}, message_obj["cmd_id"], api_log)
-=======
-			# 1003 Could not be found
-			# TODO ERROR Documentation 10003
-			self.sendAPIInformWorkerDependencyResult(message_obj["cmd_id"],message_obj["worker_id"], 10003, api_log, message_obj["sender_id"])
-			self.sendAPIInform({"dependency_data":message_obj, "result_code": 10003, "message": "Could not find CMD ID in Database.","message_at": str(datetime.datetime.now())},api_log)
-			self.sendAPILog(10003,{"out":message_obj,"error":"Could not find CMD in Database","exception":""}, message_obj["cmd_id"], api_log)
->>>>>>> cde02e69f0d4b6da4161b8ac6ec02a3d73087910
