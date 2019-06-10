@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, desc, exists
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import relationship, sessionmaker, scoped_session, sessionmaker
 
-from .models import Base, Commands, CommandLog, CommandDeps, CommandDepsChecks
+from .models import Base, CommandLog, Commands, OwnCommandsThatDependOn, OwnCommandsThatOtherWorkersDependOn
 from ..utils import CronioUtils
 
 class CronioWorker(object):
@@ -102,7 +102,7 @@ class CronioWorker(object):
 					# Please inform another Worker when your CMD_ID finishes.
 					elif cmd == "inform_dependency_worker" and headers["destination"] == "/queue/"+self.parent.CRONIO_WORKER_DEPENDENCY_OWN:
 						self.parent.logger_worker.debug("Please inform another worker with worker_id: %s with your cmd_id: %s " % (str(message_obj['worker_id']), str(cmd_id) ))
-						self.parent.CheckIfResultedFromOwnCommndsThatOtherWorkersDependOn(message_obj, api_log)
+						self.parent.CheckIfCommandAlreadyResultedToSendMessageOrAddItToDB(message_obj, api_log)
 					
 					# Got a result from a fellow worker of a cmd_id I am interested in.
 					# Check in DB if we are interested in it.
@@ -119,7 +119,8 @@ class CronioWorker(object):
 					self.parent.logger_worker.debug("Worker removed \"%s\" from queue" % header_message_id)
 					commandAddedPK = self.parent.AddCommandAndDependenciesOfOtherWorkersToDB(cmd_id, cmd, is_type, sender_id, dependencies, api_log)
 					self.parent.CheckWorkersDependenciesRunIfOK(cmd_id)
-					self.parent.CheckWorkersNotificationsOfCommands()
+					# self.parent.CheckWorkersNotificationsOfCommands()
+					
 # Disabled currently using the def CheckWorkersDependenciesRunIfOK the below commented out should be removed.
 					# if dependeciesNotOK:
 					# 	# Will not process command if dependency check fails
@@ -145,8 +146,6 @@ class CronioWorker(object):
 					# 	else:
 					# 		self.parent.IfPythonRun(message_obj["cmd"], cmd_id, message_obj)
 						
-					# 	# Remove the command from DB and add it to log
-					# 	self.parent.RemoveCommandFromDB(commandAddedPK)
 
 					# elif message_obj["type"] == "os":
 
@@ -157,8 +156,6 @@ class CronioWorker(object):
 					# 	else:
 					# 		cmds = [message_obj["cmd"]]
 					# 	self.parent.IfOSRun(cmds, cmd_id, message_obj)
-					# 	# Remove the command from DB and add it to log
-					# 	self.parent.RemoveCommandFromDB(commandAddedPK)
 
 			# except Exception as e:
 			# 	self.parent.conn.nack(header_message_id, self.parent.CRONIO_WORKER_ID)
@@ -168,52 +165,23 @@ class CronioWorker(object):
 
 
 	def CheckWorkersNotificationsOfCommands(self):
-		commandsFound = self.session.query(CommandLog).filter(exists().where(CommandDepsChecks.cmd_id==CommandLog.cmd_id)).order_by(CommandLog.executed_date.desc()).all()
+		commandsFound = self.session.query(CommandLog).filter(exists().where(OwnCommandsThatOtherWorkersDependOn.cmd_id==CommandLog.cmd_id)).order_by(CommandLog.executed_date.desc()).all()
 		for commandFound in commandsFound:
-			print commandsFound.cmd_id
-		# if commandFound:
-		# 	if commandFound.dependencies == "":
-		# 		self.RunCMDFromDB(cmd_id)
-		# 	else:
-		# 		checkResolvedMissing = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='No').first()
-		# 		if checkResolvedMissing:
-		# 			# Dependencies still have not been resolved.
-		# 			return False
-		# 		else:
-		# 			# Dependencies all have been resolved.
-		# 			checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=False).all()
-		# 			commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id).first()
-		# 			api_log = commandFound.api_log
-		# 			if checkResolvedAll:
-		# 				# Send message to sender_id due to failed dependencies, will not run.
-		# 				ERROR = "Failed Dependency - Will not run command with cmd_id \"%s\"" % str(cmd_id)
-		# 				self.logger_worker.critical(ERROR)
-		# 				self.SendAPILog(1,{"out":"","error":str(ERROR),"exception":""},cmd_id, api_log)
-		# 				self.SendLog({"log":"", "error": ERROR },cmd_id)
-		# 			else:
-		# 				checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
-		# 				if checkResolvedAll:
-		# 					self.RunCMDFromDB(cmd_id)
-		# 					self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
-		# else:
-		# 	ERROR = "Could not find command with cmd_id: %s " % cmd_id
-		# 	self.logger_worker.critical(ERROR)
-		# return False
+			print "inside"
+			pprint.pprint(commandsFound)
+			print "inside end"
 
-
-	def CheckWorkersDependenciesRunIfOK(self, cmd_id):
-		commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id, status="pending").first()
-		if commandFound:
-			if commandFound.dependencies == "":
+		if commandsFound:
+			if commandFound.does_depend_on == False:
 				self.RunCMDFromDB(cmd_id)
 			else:
-				checkResolvedMissing = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='No').first()
+				checkResolvedMissing = self.session.query(OwnCommandsThatDependOn).filter_by(depends_on_cmd_id=cmd_id,status='Waiting').first()
 				if checkResolvedMissing:
 					# Dependencies still have not been resolved.
 					return False
 				else:
 					# Dependencies all have been resolved.
-					checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=False).all()
+					checkResolvedAll = self.session.query(OwnCommandsThatDependOn).filter_by(depends_on_cmd_id=cmd_id,status='Yes',ok_to_run=False).all()
 					commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id).first()
 					api_log = commandFound.api_log
 					if checkResolvedAll:
@@ -223,10 +191,79 @@ class CronioWorker(object):
 						self.SendAPILog(1,{"out":"","error":str(ERROR),"exception":""},cmd_id, api_log)
 						self.SendLog({"log":"", "error": ERROR },cmd_id)
 					else:
-						checkResolvedAll = self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
+						checkResolvedAll = self.session.query(OwnCommandsThatDependOn).filter_by(depends_on_cmd_id=cmd_id,status='Yes',ok_to_run=True).all()
 						if checkResolvedAll:
 							self.RunCMDFromDB(cmd_id)
-							self.session.query(CommandDeps).filter_by(to_run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
+							self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,resolved='Yes',ok_to_run=True).all()
+		else:
+			info = "Could not find any commands. "
+			self.logger_worker.debug(info)
+		return False
+
+
+	def CheckWorkersDependenciesRunIfOK(self, cmd_id):
+		commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id, status="Pending").first()
+		if commandFound:
+			commandFound.status="In progress"
+			self.session.commit()
+			if commandFound.does_depend_on == False:
+				self.RunCMDFromDB(cmd_id)
+			else:
+				checkResolvedMissing = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id).all()
+				# print(self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id).filter(OwnCommandsThatDependOn.status != 'OK').statement.compile())
+				if checkResolvedMissing:
+					# Dependencies still have not been resolved.
+					self.logger_worker.debug("Dependencies still have not been resolved.")
+					for missingResult in checkResolvedMissing:
+						if missingResult.depends_on_worker_id == self.CRONIO_WORKER_ID:
+							gotOne = self.session.query(CommandLog).filter_by(cmd_id=missingResult.depends_on_cmd_id).first()
+							if gotOne:
+								if missingResult.depends_on_result_code == gotOne.result_code:
+									self.logger_worker.debug("cmd_id %s - Matches OK", missingResult.depends_on_cmd_id)
+									missingResult.status = "OK"
+								else:
+									self.logger_worker.debug("cmd_id %s - Matches Fail", missingResult.depends_on_cmd_id)
+									missingResult.status = "Fail"
+								missingResult.resulted_result_code = gotOne.result_code
+								missingResult.resulted_datetime = datetime.datetime.now()
+								self.session.commit()
+						else:
+							self.logger_worker.debug("Skipping check of internal commandLog for cmd_id %s", missingResult.depends_on_cmd_id)
+					checkResolvedFail = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='Fail').first()
+					if checkResolvedFail:
+						self.MoveToCommandLog(cmd_id, "10003", "Fail")
+					else:
+						checkResolvedWaiting = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='Waiting').first()
+						if checkResolvedWaiting:
+							commandFound.status="Pending"
+							self.session.commit()
+							return False
+						else:
+							checkResolvedSuccess = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='OK').count()
+							checkResolved_ALL = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id).count()
+							if checkResolvedSuccess == checkResolved_ALL:
+								self.RunCMDFromDB(cmd_id)
+							else:
+								self.logger_worker.debug("I should have never ever reached this result! Help me cmd_id %s", cmd_id)
+								return False
+					return False
+				else:
+					# Dependencies all have been resolved.
+					checkResolvedAll = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='Fail').all()
+					commandFound = self.session.query(Commands).filter_by(cmd_id=cmd_id).first()
+					api_log = commandFound.api_log
+					if checkResolvedAll:
+						# Send message to sender_id due to failed dependencies, will not run.
+						ERROR = "Failed Dependency - Will not run command with cmd_id \"%s\"" % str(cmd_id)
+						self.logger_worker.critical(ERROR)
+						self.SendAPILog(1,{"out":"","error":str(ERROR),"exception":""},cmd_id, api_log)
+						self.SendLog({"log":"", "error": ERROR },cmd_id)
+					else:
+						self.logger_worker.debug("In else, ")
+						checkResolvedAll = self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='OK').all()
+						if checkResolvedAll:
+							self.RunCMDFromDB(cmd_id)
+							self.session.query(OwnCommandsThatDependOn).filter_by(run_cmd_id=cmd_id,status='OK').all()
 		else:
 			ERROR = "Could not find command with cmd_id: %s " % cmd_id
 			self.logger_worker.critical(ERROR)
@@ -234,29 +271,27 @@ class CronioWorker(object):
 
 
 	def DependencyResolved(self, cmd_id, result_code, worker_id, sender_id):
-
 		# Check if the command is already in my db
 		# TODO Nikolas Continue
-
-		dependencyFound = self.session.query(CommandDeps).filter_by(dep_cmd_id=cmd_id,worker_id=worker_id,sender_id=sender_id).first()
+		dependencyFound = self.session.query(OwnCommandsThatDependOn).filter_by(depends_on_cmd_id=cmd_id,depends_on_worker_id=worker_id,sender_id=sender_id,status="Waiting").first()
 		if dependencyFound:
-			dependencyFound.resolved = 'Yes'
-			dependencyFound.resolved_result_code = result_code
-			dependencyFound.resolved_date = datetime.datetime.now()
-			if dependencyFound.resolved_result_code == dependencyFound.to_run_result_code:
-				dependencyFound.ok_to_run = True
+			dependencyFound.resulted_result_code = result_code
+			dependencyFound.resulted_datetime = datetime.datetime.now()
+			if dependencyFound.depends_on_result_code == result_code:
+				dependencyFound.status = "OK"
 			else:
-				dependencyFound.ok_to_run = False
+				dependencyFound.status = "Fail"
 			self.session.commit()
-			self.CheckWorkersDependenciesRunIfOK(dependencyFound.to_run_cmd_id)
 			return True
 		return False
 
 
 	def RunCMDFromDB(self,cmd_id):
-		commandFoundDB = self.session.query(Commands).filter_by(cmd_id=cmd_id,status='pending').first()
+		commandFoundDB = self.session.query(Commands).filter_by(cmd_id=cmd_id,status='In progress').first()
 		if commandFoundDB:
-			message_obj = {"type": commandFoundDB.is_type, "cmd": commandFoundDB.cmd, "cmd_id": commandFoundDB.cmd_id, "api_log": commandFoundDB.api_log, "dependencies": commandFoundDB.dependencies, "sender_id": commandFoundDB.sender_id}
+			commandFoundDB.status="Running"
+			self.session.commit()
+			message_obj = {"type": commandFoundDB.is_type, "cmd": commandFoundDB.cmd, "cmd_id": commandFoundDB.cmd_id, "api_log": commandFoundDB.api_log, "dependencies": commandFoundDB.does_depend_on, "sender_id": commandFoundDB.sender_id}
 			self.logger_worker.debug("Got a command from database with cmd_id \"%s\" trying to run it now." % cmd_id)
 			if message_obj["type"] == "python":
 				# python cmd
@@ -285,9 +320,6 @@ class CronioWorker(object):
 					cmds = [message_obj["cmd"]]
 				self.IfOSRun(cmds, message_obj["cmd_id"], message_obj)
 			# Remove the command from DB and add it to log
-
-			self.session.delete(commandFoundDB)
-			self.session.commit()
 
 		else:
 			self.logger_worker.critical("Tried to run a command from database with cmd_id \"%s\" and failed to find it." % cmd_id)
@@ -345,13 +377,14 @@ class CronioWorker(object):
 		self.logger_worker.debug("Adding Command and Dependencies if any in DB.")
 		self.logger_worker.debug(" Adding Command %s" % cmd_id)
 		if dependencies is None:
-			commandNew = Commands(cmd_id=cmd_id,cmd=cmd,is_type=is_type, sender_id=sender_id, dependencies=None, api_log=api_log)
+			commandNew = Commands(cmd_id=cmd_id,cmd=cmd,is_type=is_type, sender_id=sender_id, does_depend_on=False, api_log=api_log)
 			self.session.add(commandNew)
 			self.session.commit()
 			pk = commandNew.pk
 			self.logger_worker.debug(" No Dependencies")
 		else:
-			commandNew = Commands(cmd_id=cmd_id,cmd=cmd,is_type=is_type, sender_id=sender_id, dependencies=json.dumps(dependencies), api_log=api_log)
+			dependsOn = json.dumps(dependencies)
+			commandNew = Commands(cmd_id=cmd_id,cmd=cmd,is_type=is_type, sender_id=sender_id, does_depend_on=True, api_log=api_log)
 			self.session.add(commandNew)
 			self.session.commit()
 			pk = commandNew.pk
@@ -363,21 +396,50 @@ class CronioWorker(object):
 					if "worker_id" in dependency:
 						dependency_worker_id = dependency['worker_id']
 					self.logger_worker.debug("  - result_code is %s, dependency cmd_id: %s, worker_id: %s " % (dependency['result_code'], dependency['cmd_id'], dependency_worker_id))
-					newCmdDep = CommandDeps(dep_cmd_id=dependency['cmd_id'], to_run_cmd_id= cmd_id, to_run_result_code=dependency['result_code'], worker_id=dependency_worker_id, sender_id=sender_id)
+					"""
+	pk = Column(INTEGER, nullable=False, primary_key=True)
+	sender_id = Column(VARCHAR(64), default='sender_1', nullable=False)
+	worker_id = Column(VARCHAR(64), nullable=False)
+	cmd_id = Column(VARCHAR(64), nullable=True)
+	created_date = Column(DATETIME, default=datetime.datetime.now, nullable=False)
+	
+	Below are the resulted data which are send to the above worker_id
+	
+	result_sent = Column(BOOLEAN, default=False, nullable=False)
+	result_sent_datetime = Column(DATETIME, nullable=True)
+	result_code = Column(Integer, default=None, nullable=True) ----- Final Result Code ------
+					"""
+					newCmdDep = OwnCommandsThatDependOn(sender_id=sender_id, depends_on_worker_id=dependency_worker_id, depends_on_cmd_id=dependency['cmd_id'], depends_on_result_code=dependency['result_code'], run_cmd_id=cmd_id, created_date = datetime.datetime.now(), status="Waiting")
 					self.session.add(newCmdDep)
 					self.session.commit()
 				else:
 					self.logger_worker.debug("  - (Old Format default) result_code is 0, dependency cmd_id: %s" % dependency)
-					newCmdDep = CommandDeps(dep_cmd_id=dependency, to_run_cmd_id= cmd_id, to_run_result_code=0, worker_id=self.CRONIO_WORKER_ID, sender_id=sender_id)
+					"""
+	pk = Column(INTEGER, nullable=False, primary_key=True)
+	sender_id = Column(VARCHAR(64), default='sender_1', nullable=False)
+	depends_on_worker_id = Column(VARCHAR(64), nullable=False)
+	depends_on_cmd_id = Column(VARCHAR(64), nullable=True)
+	depends_on_result_code = Column(Integer, default=0, nullable=False)
+	run_cmd_id = Column(VARCHAR(64), nullable=True)
+	created_date = Column(DATETIME, default=datetime.datetime.now, nullable=False)
+	status = Column(VARCHAR(10), default='Waiting', nullable=False)
+	
+	Possible status values:
+		Waiting - Default
+		Fail
+		OK
+	
+	
+	Below are the resulted data which when we receive word that the depends_on_cmd_id is executed, after we check the result code received
+	with what we have on our record is the same, then we execute it.
+	
+	resulted_result_code = Column(Integer, default=0, nullable=False)
+	resulted_datetime = Column(DATETIME, nullable=True)
+					"""
+					newCmdDep = OwnCommandsThatDependOn(sender_id=sender_id, depends_on_worker_id=self.CRONIO_WORKER_ID, depends_on_cmd_id=dependency, run_cmd_id= cmd_id, depends_on_result_code=0, status="Waiting")
 					self.session.add(newCmdDep)
 					self.session.commit()
 		return pk
-
-	def RemoveCommandFromDB(self, pk):
-		commandFound = self.session.query(Commands).filter_by(pk=pk).first()
-		if commandFound:
-			self.session.delete(commandFound)
-			self.session.commit()
 
 	def ClearDatabase(self):
 		print "Clear Database"
@@ -405,30 +467,38 @@ class CronioWorker(object):
 
 		self.logger_worker.debug(" Log Will Send Message:")	
 		self.logger_worker.debug("  OUT: %s" % OUT)
+		status = "Completed"
 		if ERROR != "" or ExceptionError != "":
 			self.logger_worker.debug("  ERROR: %s"% str(ERROR+str(ExceptionError)))
+			status = "Error"
 		if self.CRONIO_TEST_IS_NOT_ON:
 			self.SendAPILog(result_code,{"out":OUT,"error":str(ERROR),"exception":str(ExceptionError)},cmd_id, job_message["api_log"])
-			self.AddToCommandLog(cmd_id, cmd, job_message["type"], job_message["sender_id"], job_message["dependencies"], result_code, job_message["api_log"])
+			does_depend_on = True
+			if job_message["dependencies"] == "":
+				does_depend_on = False
+			# Removed the add to command log, for simplicity to add it and then remove it from commands.
+			# self.AddToCommandLog(cmd_id, cmd, job_message["type"], job_message["sender_id"], does_depend_on, result_code, job_message["api_log"], status)
+			self.MoveToCommandLog(cmd_id, result_code, status)
 			self.SendLog({"log":OUT, "error": ERROR+str(ExceptionError) },cmd_id)
 		return True
 
-	def AddToCommandLog(self, cmd_id, cmd, is_type, sender_id, dependencies, result_code, api_log):
-		commandLogNew = CommandLog(cmd_id=cmd_id, cmd=json.dumps(cmd),is_type=is_type, sender_id=sender_id, dependencies=json.dumps(dependencies), result_code=result_code, api_log=api_log)
+	def MoveToCommandLog(self, cmd_id, result_code, status):
+		commandToBeMoved = self.session.query(Commands).filter_by(cmd_id=cmd_id).first()
+		if commandToBeMoved:
+			commandLogNew = CommandLog(cmd_id=commandToBeMoved.cmd_id, cmd=json.dumps(commandToBeMoved.cmd),is_type=commandToBeMoved.is_type, sender_id=commandToBeMoved.sender_id, does_depend_on=commandToBeMoved.does_depend_on, result_code=result_code, api_log=commandToBeMoved.api_log, status=status)
+			self.session.add(commandLogNew)
+			self.session.delete(commandToBeMoved)
+			self.session.commit()
+			self.DependencyResolved(cmd_id, result_code, self.CRONIO_WORKER_ID, commandToBeMoved.sender_id)
+			self.CheckIfResultedFromOwnCommandsThatOtherWorkersDependOn(cmd_id, commandToBeMoved.sender_id)
+	
+
+	def AddToCommandLog(self, cmd_id, cmd, is_type, sender_id, does_depend_on, result_code, api_log, status):
+		commandLogNew = CommandLog(cmd_id=cmd_id, cmd=json.dumps(cmd),is_type=is_type, sender_id=sender_id, does_depend_on=does_depend_on, result_code=result_code, api_log=api_log, status=status)
 		self.session.add(commandLogNew)
 		self.session.commit()
 
-# Added, not sure if we also want to send an update message to get the dependency again, probably yes!
-	def UpdateCommandLog(self, cmd_id, result_code):
-		commandLogEdit = self.session.query(CommandLog).filter_by(cmd_id=cmd_id).first()
-		# CommandLog(cmd_id=cmd_id, cmd=json.dumps(cmd),is_type=is_type, sender_id=sender_id, dependencies=json.dumps(dependencies), result_code=result_code, api_log=api_log)
-		if commandLogFound:
-			commandLogEdit.result_code = result_code
-			self.logger_worker.debug("Update of cmd_id: %s with result_code: %s",str(cmd_id), str(result_code))	
-			self.session.commit()
-		else:
-			self.logger_worker.debug("Did not find cmd in database to update it. cmd_id: %s",cmd_id)	
-		
+
 	def WriteToTemp(self, cmds):
 		# Handle opening the file yourself. This makes clean-up
 		# more complex as you must watch out for exceptions
@@ -472,11 +542,18 @@ class CronioWorker(object):
 
 		self.logger_worker.debug(" Log Will Send Message:")	
 		self.logger_worker.debug("  OUT: %s"%OUT)
+		does_depend_on = True
+		if job_message["dependencies"] == "":
+			does_depend_on = False
+		status = "Completed"
 		if ERROR != "" or ExceptionError != "":
 			self.logger_worker.debug("  ERROR: %s"%str(ERROR+str(ExceptionError)))
+			status = "Error"
 		if self.CRONIO_TEST_IS_NOT_ON:
 			self.SendAPILog(result_code,{"out":OUT,"error":ERROR,"exception":ExceptionError},cmd_id, job_message["api_log"])
-			self.AddToCommandLog(cmd_id, cmd, job_message["type"], job_message["sender_id"], job_message["dependencies"], result_code, job_message["api_log"])
+			# Removed the add to command log, for simplicity to add it and then remove it from commands.
+			# self.AddToCommandLog(cmd_id, cmd, job_message["type"], job_message["sender_id"], does_depend_on, result_code, job_message["api_log"], status)
+			self.MoveToCommandLog(cmd_id, result_code, status)
 			self.SendLog({"log":OUT, "error": ERROR+str(ExceptionError) },cmd_id)
 		return True
 
@@ -516,24 +593,31 @@ class CronioWorker(object):
 
 
 	# Send the result to a Fellow Worker so that he is informed of the result and take proper action.
-	def SendTheResultToOtherWorker(self, cmd_id, worker_id, result_code, api_log, sender_id):
+	def SendTheResultToOtherWorkerMarkItAsSent(self, cmd_id, worker_id, result_code, api_log, sender_id):
 		if self.CRONIO_WORKER_ID == worker_id:
-			self.logger_worker.debug("Dear Worker %s  , the cmd_id: %s has result_code: %s. Your fellow self orker %s" % (worker_id, cmd_id, result_code, self.CRONIO_WORKER_ID))
-			self.logger_worker.info("Skipped Sending it, both workers are the same. %s" % (cmd_id))
+			self.logger_worker.debug("Dear Self Worker %s  , the cmd_id: %s has result_code: %s. Your fellow self worker %s" % (worker_id, cmd_id, result_code, self.CRONIO_WORKER_ID))
+			self.logger_worker.info("Skipped Sending it - Updating it, both workers are the same. %s" % (cmd_id))
 		else:		
 			data = {"cmd_id": cmd_id, "worker_id": self.CRONIO_WORKER_ID, "result_code": result_code, "type": "operation", "cmd": "dependency_result", "sender_id": sender_id, "api_log": api_log}
 			self.logger_worker.debug("Dear Worker %s  , the cmd_id: %s has result_code: %s. Your fellow Worker %s" % (worker_id, cmd_id, result_code, self.CRONIO_WORKER_ID))
 			self.SendAPIInform({"dependency_data":data, "worker_id": worker_id ,"message_at": str(datetime.datetime.now())},api_log)
 			self.conn.send(body=json.dumps(data), destination=self.CRONIO_WORKER_DEPENDENCY_PREFIX + worker_id, vhost=self.CRONIO_AMQP_VHOST)
+			commandOtherWorkersDependsOnFound = self.session.query(OwnCommandsThatOtherWorkersDependOn).filter_by(cmd_id=cmd_id,sender_id=sender_id, worker_id=worker_id).first()
+			if commandOtherWorkersDependsOnFound:
+				commandOtherWorkersDependsOnFound.result_sent = True
+				commandOtherWorkersDependsOnFound.result_sent_datetime = datetime.datetime.now()
+				commandOtherWorkersDependsOnFound.result_code = result_code
+				self.session.commit()
 
-	def AddToOwnCommndsThatOtherWorkersDependOn(self, cmd_id, worker_id, sender_id):
+
+
+	def AddToOwnCommandsThatOtherWorkersDependOn(self, cmd_id, worker_id, api_log, sender_id):
 		# Check if this worker's depends on the cmd already been added.
 		ownCommandsThatOtherWorkersDependOnRecordFound = self.session.query(OwnCommandsThatOtherWorkersDependOn).filter_by(sender_id=sender_id, worker_id=worker_id, cmd_id=cmd_id).first()
 		
 		# If yes, then skip adding it, but do note it
 		if ownCommandsThatOtherWorkersDependOnRecordFound:
-			self.logger_worker.debug("The worker already exists in db for receiving the result. Skipping adding it. cmd_id: %s  and result_code: %s worker_id: %s"% (cmd_id, result_code, worker_id))
-			self.SendTheResultToOtherWorker(message_obj["cmd_id"], message_obj["worker_id"], commandLogFound.result_code, api_log, message_obj["sender_id"])
+			self.logger_worker.debug("The worker already exists in db for receiving the result. Skipping adding it. cmd_id: %s, worker_id: %s, sender_id: %s"% (cmd_id, worker_id, sender_id))
 			
 		# else, store in the database and wait for it. 
 		else:
@@ -542,19 +626,36 @@ class CronioWorker(object):
 			self.session.commit()
 
 
-	def CheckIfResultedFromOwnCommndsThatOtherWorkersDependOn(self, message_obj, api_log):
+	def CheckIfResultedFromOwnCommandsThatOtherWorkersDependOn(self, cmd_id, sender_id):
+		# Check if this command has already been executed
+		commandLogFound = self.session.query(CommandLog).filter_by(cmd_id=cmd_id,sender_id=sender_id).first()
+		
+		# If yes, then send the result to the fellow worker
+		if commandLogFound:
+			commandOtherWorkersDependsOnFound = self.session.query(OwnCommandsThatOtherWorkersDependOn).filter_by(cmd_id=cmd_id,sender_id=sender_id).first()
+			if commandOtherWorkersDependsOnFound:
+				self.SendTheResultToOtherWorkerMarkItAsSent(cmd_id, commandOtherWorkersDependsOnFound.worker_id, commandLogFound.result_code, commandLogFound.api_log, sender_id)
+			else:
+				return False
+			
+		# else, store in the database and wait for it. 
+		else:
+			self.logger_worker.debug("Not found or not Resulted Yet.  cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
+	
+
+	def CheckIfCommandAlreadyResultedToSendMessageOrAddItToDB(self, message_obj, api_log):
 		# Check if this command has already been executed
 		commandLogFound = self.session.query(CommandLog).filter_by(cmd_id=message_obj["cmd_id"],sender_id=message_obj["sender_id"]).first()
 		
 		# If yes, then send the result to the fellow worker
 		if commandLogFound:
-			self.SendTheResultToOtherWorker(message_obj["cmd_id"], message_obj["worker_id"], commandLogFound.result_code, api_log, message_obj["sender_id"])
+			self.SendTheResultToOtherWorkerMarkItAsSent(message_obj["cmd_id"], message_obj["worker_id"], commandLogFound.result_code, api_log, message_obj["sender_id"])
 			
 		# else, store in the database and wait for it. 
 		else:
 			self.logger_worker.debug("Not found or not Resulted Yet. We will put it in db and wait for it. Old version was giving 10003 error. cmd_id: %s, worker_id: %s, sender_id: %s"% (message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"]))
-			self.AddToOwnCommndsThatOtherWorkersDependOn(message_obj["cmd_id"], message_obj["worker_id"], message_obj["sender_id"])
+			self.AddToOwnCommandsThatOtherWorkersDependOn(message_obj["cmd_id"], message_obj["worker_id"], api_log, message_obj["sender_id"])
 			# Removed the below, it will stay in the db, will wait for other cmds.
-			# self.SendTheResultToOtherWorker(message_obj["cmd_id"],message_obj["worker_id"], 10003, api_log, message_obj["sender_id"])
+			# self.SendTheResultToOtherWorkerMarkItAsSent(message_obj["cmd_id"],message_obj["worker_id"], 10003, api_log, message_obj["sender_id"])
 			# self.SendAPIInform({"dependency_data":message_obj, "result_code": 10003, "message": "Could not find CMD ID in Database.","message_at": str(datetime.datetime.now())},api_log)
 			# self.SendAPILog(10003,{"out":message_obj,"error":"Could not find CMD in Database","exception":""}, message_obj["cmd_id"], api_log)

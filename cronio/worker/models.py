@@ -16,10 +16,10 @@ Commands' log of executed commands
 class CommandLog(Base):
 	__tablename__ = 'command_log'
 	pk = Column(INTEGER, nullable=False, primary_key=True)
+	sender_id = Column(VARCHAR(64), default='sender_1', nullable=False)
 	cmd_id = Column(VARCHAR(64), nullable=True)
 	cmd = Column(BLOB,nullable=False)
 	is_type = Column(VARCHAR(10), default='os', nullable=False)
-	sender_id = Column(VARCHAR(64), default='sender_1', nullable=False)
 	executed_date = Column(DATETIME,default=datetime.datetime.now, nullable=False)
 	does_depend_on = Column(BOOLEAN, default=False, nullable=False)
 	api_log = Column(VARCHAR(64), default='', nullable=False)
@@ -51,7 +51,6 @@ class Commands(Base):
 	Possible status values:
 		Pending - Default
 		Running
-		Completed
 		Error
 	"""
 	__table_args__ = (UniqueConstraint('cmd_id', 'sender_id', name='command_uix_1'),)
