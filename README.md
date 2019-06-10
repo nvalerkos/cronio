@@ -47,41 +47,71 @@ For Code see examples\ directory
 	
 Worker:
 
-	python worker.py # this will start the worker process, see inline comments
+	python worker1.py # this will start the worker process, see inline comments
 
 
 Sender:
 
-	python sender.py # this has everything in it
+	python sender_complex_multi_workers_example2.py # this has everything in it
 	
 
 ## Custom Listener for Sender
 
 Modify it based on your current needs on listening for worker's messages to act accordingly.
+		
+	WORKER_ID_1 = "worker_1"
+	CS_1 = CronioSender({
+	# To Enable Viewer Log, uncomment the below in worker and sender:
+	# 'CRONIO_SENDER_EXCHANGE_LOG_INFO': "cronio_log_info",
+	# 'CRONIO_SENDER_EXCHANGE_LOG_ERROR': "cronio_log_error",
+	'CRONIO_SENDER_AMQP_USERNAME': "sender1",
+	'CRONIO_SENDER_AMQP_PASSWORD': "somepass",
+	'CRONIO_SENDER_WORKER_QUEUE': "cronio_queue"+WORKER_ID_1,
+	'CRONIO_SENDER_AMQP_HOST': 'localhost',
+	'CRONIO_SENDER_AMQP_VHOST': '/',
+	'CRONIO_SENDER_AMQP_PORT': 61613,
+	'CRONIO_SENDER_AMQP_USE_SSL': False,
+	'CRONIO_SENDER_LOGGER_LEVEL':  logging.DEBUG, #logging.DEBUG
+	'CRONIO_SENDER_LOGGER_FORMATTER': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+	'CRONIO_SENDER_RUNTIME_SECONDS': 5})
 
-	class CronioSenderListener(stomp.ConnectionListener):
+	class CronioSenderListener1(stomp.ConnectionListener):
 		def on_error(self, headers, message):
-			# pprint.pprint(headers)
-			# pprint.pprint(message)
-			CS.logger_sender.debug('Cronio Sender Listener received an error "%s"' % message)
+			pprint.pprint(headers)
+			pprint.pprint(message)
+			CS_1.logger_sender.debug('Cronio Sender Listener received an error "%s"' % message)
 		def on_message(self, headers, message):
 			# Use the below to your discretion on receiving new messages
-			# CS.logger_sender.debug(' %s' % str(headers['message-id']))
-			# CS.logger_sender.debug(' Log %s' % str(message))
-			# CS.logger_sender.debug('ACK Log - Remove from Queue %s' % str(headers['message-id']))
+			# CS_1.logger_sender.debug(' %s' % str(headers['message-id']))
+			# CS_1.logger_sender.debug(' Log %s' % str(message))
+			# CS_1.logger_sender.debug('ACK Log - Remove from Queue %s' % str(headers['message-id']))
 			# MESSAGE IS IN JSON
 			message_obj = json.loads(message)
-			if headers['subscription'] == "api_log":
-				pprint.pprint(message_obj)
-			else:
+			pprint.pprint(message_obj)
+			# if headers['subscription'] == "api_log":
+			# 	pprint.pprint(message_obj)
+			# if headers['subscription'] == "api_log":
+				# This here is where the magic happens
+				# print "API LOG =================================="
+				# pprint.pprint(message_obj)
+				# print "API LOG ENDS ============================="
+			# else:
 				# a bunch of other messages
-				print "view_log - or error"
+				# print "view_log - or error"
+
 			# remove from queue
-			CS.conn.ack(headers['message-id'],1)
+			CS_1.conn.ack(headers['message-id'],1)
+
+	CS_1.conn.disconnect()
+	CS_1.conn.remove_listener('default')
+	CS_1.cronio_sender_listener = CronioSenderListener1() 
+	CS_1.initConnectSenderSTOMP()
+	CS_1.conn.subscribe(destination=CS_1.CRONIO_SENDER_API_LOG, id="api_log1", ack='client')
+	
 
 
 ## Worker Queues
-> After version 1.1.0, the worker queues are modified in a more standardized way to enable the multiworker dependancy:
+> After version 1.1.0, the worker queues are modified in a more standardized way to enable the multiworker dependancy, if you want to do such a thing!:
 ie.
 
 	self.CRONIO_WORKER_ID = '1_worker'
@@ -113,13 +143,17 @@ ie.
 >Execute a git command and get the result in the listener
 
 	# Use those on the following commands:
+	
+	# clear database of worker
+	CS_1.sendCMD('cleardb',WORKER_ID_1,'operation',0)
+	
 	# git clone a repo
-	CS.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","os",cmd_ids[1])
+	CS_1.sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git", WORKER_ID_1, "os", cmd_ids[1])
 
 >or just a simple listing
 
 	#execute ls command on the current folder
-	CS.sendCMD("ls","os",cmd_ids[2])
+	CS.sendCMD("ls", WORKER_ID_1, "os", cmd_ids[2])
 	
 
 >Can send files if you want to execute those:
@@ -127,41 +161,21 @@ ie.
 	# Absolute Path only
 	PythonFile = "/opt/cronio/examples/test.py"
 	CmdFile = "/opt/cronio/examples/test.sh"
-	CS.sendPythonFile(PythonFile,1)
-	CS.sendCmdFile(CmdFile,2)
+	CS.sendPythonFile(PythonFile,WORKER_ID_1,1)
+	CS.sendCmdFile(CmdFile,WORKER_ID_1,2)
 
 
 	# Clear Database of its commands
-	CS.sendCMD('cleardb','operation',cmd_ids[4])
+	CS.sendCMD('cleardb',WORKER_ID_1,'operation',cmd_ids[4])
 
 
 >Use workflow to run on the worker.
 
 	# Workflow Example - Set of commands related with each other.
-	commands = [ {"cmd": "ls", "type": "os", "cmd_id": 1, "dependencies": None}, {"cmd": "mkdir test_1", "type": "os", "cmd_id": 2, "dependencies": None}, {"cmd": "cd test_1", "type": "os", "cmd_id": 3, "dependencies": [2]},{"cmd": "print \"hello cronio\"", "type": "python", "cmd_id": 4,"dependencies" : None}]
+	commands = [ {"cmd": "ls", "worker_id": "worker_1", type": "os", "cmd_id": 1, "dependencies": None}, {"cmd": "mkdir test_1", "worker_id": "worker_1", type": "os", "cmd_id": 2, "dependencies": None}, {"cmd": "cd test_1", "worker_id": "worker_1", type": "os", "cmd_id": 3, "dependencies": [2]},{"cmd": "print \"hello cronio\"", "worker_id": "worker_1", type": "python", "cmd_id": 4,"dependencies" : None}]
 	CS.sendWorkflow(commands)
 
 
+>Just add the python commands and add \n after each line
 
-### ie.1
->Clone a repository for example
-
-	sendCMD("git clone https://gitlab.com/doctormo/python-crontab.git","os",2)
-
-### ie.2
->Do listing of files/folders 
-
-	sendCMD("ls","os",2)
-
-## Execute Python commands and pass a cmd_id (ID)
-
-### ie.1
->Do a print in python
-
-	sendCMD("print \"hello World\"","python",1)
-
-
-### ie.2
->Do something more
-
-	sendCMD("iter2=[2,3,4,5,6,7]\nfor item2 in iter2:\n\tprint item2","python",2)
+	sendCMD("iter2=[2,3,4,5,6,7]\nfor item2 in iter2:\n\tprint item2",WORKER_ID_1,"python",2)
