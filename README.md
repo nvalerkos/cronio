@@ -114,12 +114,13 @@ Modify it based on your current needs on listening for worker's messages to act 
 > After version 1.1.0, the worker queues are modified in a more standardized way to enable the multiworker dependancy, if you want to do such a thing!:
 ie.
 
-	self.CRONIO_WORKER_ID = '1_worker'
+	self.CRONIO_WORKER_ID = 'worker_1'
 	self.CRONIO_WORKER_PREFIX = '/queue/cronio/'
 	self.CRONIO_WORKER_QUEUE =  self.CRONIO_WORKER_PREFIX + self.CRONIO_WORKER_ID
 	
 > Hence that, the CRONIO_WORKER_QUEUE param in class and settings needs to be avoided if you want to have the multiworker dependancy to work. Otherwise we will need to add namespaces for it. Which are going a bit off topic.
-> Ensure that you set CRONIO_WORKER_ID and CRONIO_WORKER_PREFIX on each worker and have the same CRONIO_WORKER_PREFIX in all workers. Avoid using CRONIO_WORKER_ID in the format: worker1 and worker11 otherwise you might end up having difficulty setting permissions for specific workers.
+> Ensure that you set CRONIO_WORKER_ID and CRONIO_WORKER_PREFIX on each worker and have the same CRONIO_WORKER_PREFIX in all workers. 
+> Avoid using CRONIO_WORKER_ID in the format: worker1 and worker11 otherwise you might end up having difficulty setting permissions for specific workers.
 
 
 ## Dependency Checks
@@ -136,6 +137,7 @@ ie.
 
 >Generate cmd_ids to use for each:
 
+	import pprint
 	cmd_ids = [str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4()),str(uuid.uuid4())]
 	pprint.pprint(cmd_ids)
 
@@ -153,7 +155,7 @@ ie.
 >or just a simple listing
 
 	#execute ls command on the current folder
-	CS.sendCMD("ls", WORKER_ID_1, "os", cmd_ids[2])
+	CS_1.sendCMD("ls", WORKER_ID_1, "os", cmd_ids[2])
 	
 
 >Can send files if you want to execute those:
@@ -161,21 +163,21 @@ ie.
 	# Absolute Path only
 	PythonFile = "/opt/cronio/examples/test.py"
 	CmdFile = "/opt/cronio/examples/test.sh"
-	CS.sendPythonFile(PythonFile,WORKER_ID_1,1)
-	CS.sendCmdFile(CmdFile,WORKER_ID_1,2)
+	CS_1.sendPythonFile(PythonFile,WORKER_ID_1,1)
+	CS_1.sendCmdFile(CmdFile,WORKER_ID_1,2)
 
 
 	# Clear Database of its commands
-	CS.sendCMD('cleardb',WORKER_ID_1,'operation',cmd_ids[4])
+	CS_1.sendCMD('cleardb',WORKER_ID_1,'operation',cmd_ids[4])
 
 
 >Use workflow to run on the worker.
 
 	# Workflow Example - Set of commands related with each other.
 	commands = [ {"cmd": "ls", "worker_id": "worker_1", type": "os", "cmd_id": 1, "dependencies": None}, {"cmd": "mkdir test_1", "worker_id": "worker_1", type": "os", "cmd_id": 2, "dependencies": None}, {"cmd": "cd test_1", "worker_id": "worker_1", type": "os", "cmd_id": 3, "dependencies": [2]},{"cmd": "print \"hello cronio\"", "worker_id": "worker_1", type": "python", "cmd_id": 4,"dependencies" : None}]
-	CS.sendWorkflow(commands)
+	CS_1.sendWorkflow(commands)
 
 
 >Just add the python commands and add \n after each line
 
-	sendCMD("iter2=[2,3,4,5,6,7]\nfor item2 in iter2:\n\tprint item2",WORKER_ID_1,"python",2)
+	CS_1.sendCMD("iter2=[2,3,4,5,6,7]\nfor item2 in iter2:\n\tprint item2",WORKER_ID_1,"python",2)
