@@ -156,4 +156,3 @@ CS_1.sendCMD('echo "4"',WORKER_ID_1,'os',4, dependencies_cmd_4)
 
 CS_1.conn.disconnect()
 CS_2.conn.disconnect()
-

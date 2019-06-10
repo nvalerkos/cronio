@@ -77,7 +77,7 @@ class CronioSender(object):
 			self.logger_sender.debug('Reading Python file: %s' % pythonFile)
 			with open(pythonFile) as f:
 				cmds = f.readlines()
-			self.sendCMD("".join(cmds), worker_id, "python",cmd_id, dependencies)
+			self.sendCMD("".join(cmds), str(worker_id), "python",cmd_id, dependencies)
 			return True
 		else:
 			print 'Python file does not exists : %s' % pythonFile
@@ -94,7 +94,7 @@ class CronioSender(object):
 				self.logger_sender.debug('Reading commands file: %s' % cmdFile)
 				with open(cmdFile) as f:
 					cmds = f.readlines()
-				self.sendCMD("".join(cmds), worker_id, "os",cmd_id,dependencies)
+				self.sendCMD("".join(cmds), str(worker_id), "os",cmd_id,dependencies)
 				return True
 			else:
 				self.logger_sender.debug('Commands file does not exists : %s' % cmdFile)
