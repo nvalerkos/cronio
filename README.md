@@ -17,7 +17,7 @@ INTRO
 ie. Complete Task A on Worker 1, and when done do Task B on Worker 2. If not done, do Task C on Worker 3.
 check examples/sender_complex_multi_worker.py
 - [ ] Time to be executed ie. using python-crontab would be a good thing
-- [ ] ENVs needs to be tested with docker that it can be set and read from this app.py
+- [x] ENVs tested with docker that it can be set and read from this app.py
 
 
 ## Requirements
