@@ -1,2 +1,2 @@
-stomp-py
+stomp.py==4.1.23
 sqlalchemy
